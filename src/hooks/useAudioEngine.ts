@@ -1,0 +1,114 @@
+'use client'
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useAtom } from 'jotai';
+import * as Tone from 'tone';
+import { currentStepAtom } from '@/store/atoms';
+
+interface UseAudioEngineReturn {
+    isPlaying: boolean;
+    start: () => Promise<void>;
+    stop: () => void;
+}
+
+export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [currentStep, setCurrentStep] = useAtom(currentStepAtom);
+    const sequenceRef = useRef<Tone.Sequence | null>(null);
+    const isInitializedRef = useRef(false);
+    const isStoppedRef = useRef(false);
+
+    // Initialize Tone.js transport
+    useEffect(() => {
+        if (!isInitializedRef.current) {
+            // Set up the transport
+            Tone.Transport.bpm.value = bpm;
+            isInitializedRef.current = true;
+        }
+
+        return () => {
+            // Cleanup on unmount
+            if (sequenceRef.current) {
+                sequenceRef.current.dispose();
+            }
+            Tone.Transport.stop();
+            Tone.Transport.cancel();
+        };
+    }, []);
+
+    // Update BPM when it changes
+    useEffect(() => {
+        Tone.Transport.bpm.value = bpm;
+    }, [bpm]);
+
+    // Create the sequence
+    useEffect(() => {
+        // Dispose of existing sequence
+        if (sequenceRef.current) {
+            sequenceRef.current.dispose();
+        }
+
+        // Create new sequence for 16 steps (16th notes)
+        sequenceRef.current = new Tone.Sequence(
+            (time, step) => {
+                // Schedule the step update to happen at the right time
+                Tone.Draw.schedule(() => {
+                    // Only update step if we're not stopped
+                    if (!isStoppedRef.current) {
+                        setCurrentStep(step);
+                    }
+                }, time);
+            },
+            Array.from({ length: 16 }, (_, i) => i), // [0, 1, 2, ..., 15]
+            '16n' // 16th notes
+        );
+
+        return () => {
+            if (sequenceRef.current) {
+                sequenceRef.current.dispose();
+            }
+        };
+    }, []);
+
+    const start = useCallback(async () => {
+        try {
+            // Start Tone.js audio context (required for user interaction)
+            if (Tone.context.state !== 'running') {
+                await Tone.start();
+            }
+
+            // Clear the stopped flag
+            isStoppedRef.current = false;
+
+            // Start the sequence and transport
+            if (sequenceRef.current) {
+                sequenceRef.current.start(0);
+            }
+            Tone.Transport.start();
+            setIsPlaying(true);
+            setCurrentStep(0); // Reset to first step
+        } catch (error) {
+            console.error('Failed to start audio engine:', error);
+        }
+    }, [setCurrentStep]);
+
+    const stop = useCallback(() => {
+        // Set the stopped flag to prevent further step updates
+        isStoppedRef.current = true;
+
+        // Stop the transport and sequence
+        Tone.Transport.stop();
+        if (sequenceRef.current) {
+            sequenceRef.current.stop();
+        }
+        setIsPlaying(false);
+
+        // Don't reset the step - leave it where it stopped
+    }, []);
+
+    return {
+        isPlaying,
+        start,
+        stop
+    };
+};
