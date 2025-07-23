@@ -3,7 +3,8 @@
 import { useCallback, useRef, useEffect } from 'react';
 import { useAtom, useAtomValue } from 'jotai';
 import * as Tone from 'tone';
-import { currentStepAtom, isPlayingAtom, getSequencerStepsAtom, getQuantizationAtom, getFreezeAtom } from '@/store/atoms';
+import { currentStepAtom, isPlayingAtom, getSequencerStepsAtom, getQuantizationAtom, getFreezeAtom, getMuteAtom } from '@/store/atoms';
+import { useDrumSamples } from './useDrumSamples';
 
 interface QuantizationConfig {
   trackIndex: number;
@@ -15,7 +16,9 @@ export const useQuantization = ({ trackIndex, bpm }: QuantizationConfig) => {
   const isPlaying = useAtomValue(isPlayingAtom);
   const quantizationEnabled = useAtomValue(getQuantizationAtom(trackIndex));
   const freezeEnabled = useAtomValue(getFreezeAtom(trackIndex));
+  const muteEnabled = useAtomValue(getMuteAtom(trackIndex));
   const [sequencerSteps, setSequencerSteps] = useAtom(getSequencerStepsAtom(trackIndex));
+  const drumSamples = useDrumSamples(trackIndex);
   
   const pendingHitsRef = useRef<Map<number, boolean>>(new Map());
   const lastProcessedStepRef = useRef(-1);
@@ -46,6 +49,12 @@ export const useQuantization = ({ trackIndex, bpm }: QuantizationConfig) => {
         newSteps[currentStep] = true;
         // Clear the pending hit
         pendingHitsRef.current.delete(currentStep);
+        
+        // When freeze is OFF, play the sample immediately here to avoid race conditions
+        // This ensures we only play when there was actually a collision
+        if (!muteEnabled) {
+          drumSamples.playSample();
+        }
       } else {
         // Deactivate the step - no collision was registered in the quantization window  
         newSteps[currentStep] = false;
@@ -54,7 +63,7 @@ export const useQuantization = ({ trackIndex, bpm }: QuantizationConfig) => {
       setSequencerSteps(newSteps);
       lastProcessedStepRef.current = currentStep;
     }
-  }, [currentStep, quantizationEnabled, isPlaying, freezeEnabled, sequencerSteps, setSequencerSteps]);
+  }, [currentStep, quantizationEnabled, isPlaying, freezeEnabled, muteEnabled, sequencerSteps, setSequencerSteps, drumSamples]);
 
   // Function to register a collision/hit
   const registerHit = useCallback(() => {

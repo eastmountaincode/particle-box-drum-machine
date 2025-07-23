@@ -40,6 +40,20 @@ export const backgroundColorAtom = atom('#ff0000');
 // Current sequencer step atom
 export const currentStepAtom = atom(0);
 
+// Global reverb parameters
+export const reverbWetAtom = atom(0.5);
+export const reverbDecayAtom = atom(2.5);
+export const reverbRoomSizeAtom = atom(0.5);
+
+// Global volume parameter
+export const globalVolumeAtom = atom(0.5);
+
+// Per-track volume atoms (1-4)
+export const trackVolume1Atom = atom(0.8);
+export const trackVolume2Atom = atom(0.8);
+export const trackVolume3Atom = atom(0.8);
+export const trackVolume4Atom = atom(0.8);
+
 // Sequencer step atoms for each track (1-4) - 16 steps each
 export const sequencerSteps1Atom = atom<boolean[]>(new Array(16).fill(false));
 export const sequencerSteps2Atom = atom<boolean[]>(new Array(16).fill(false));
@@ -119,6 +133,16 @@ export const getMuteAtom = (index: number) => {
     case 1: return mute2Atom;
     case 2: return mute3Atom;
     case 3: return mute4Atom;
+    default: throw new Error(`Invalid track index: ${index}`);
+  }
+};
+
+export const getTrackVolumeAtom = (index: number) => {
+  switch (index) {
+    case 0: return trackVolume1Atom;
+    case 1: return trackVolume2Atom;
+    case 2: return trackVolume3Atom;
+    case 3: return trackVolume4Atom;
     default: throw new Error(`Invalid track index: ${index}`);
   }
 }; 

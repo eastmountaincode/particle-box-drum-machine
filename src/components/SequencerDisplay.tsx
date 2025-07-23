@@ -37,10 +37,13 @@ export const SequencerDisplay: React.FC<SequencerDisplayProps> = ({
           {steps.map((isActive, index) => {
             const isCurrent = index === currentStep;
             const isActiveAndCurrent = isActive && isCurrent;
+            const isQuarterNote = index % 4 === 0; // Quarter notes at indices 0, 4, 8, 12
             
             // Simple logic: white background = current step, circle = active step
-            let className = 'w-8 h-8 border border-white cursor-pointer ';
+            let className = 'w-8 h-8 cursor-pointer ';
             let textColor = '';
+            className += 'border border-white ';
+
             
             if (isCurrent) {
               // Current step gets white background
@@ -57,14 +60,27 @@ export const SequencerDisplay: React.FC<SequencerDisplayProps> = ({
             className += textColor;
             
             return (
-              <div
-                key={index}
-                className={className}
-                onClick={() => onStepToggle(index)}
-                title={`Step ${index + 1} - ${isCurrent ? 'Current' : ''}${isActive ? ' Active' : ''}`}
-              >
-                <div className="w-full h-full flex items-center justify-center text-lg">
-                  {isActive ? '●' : ''}
+              <div key={index} className="flex flex-col items-center">
+                {/* Quarter note indicator */}
+                {isQuarterNote && (
+                  <div className="h-2 flex items-center justify-center mb-1">
+                    <div className="w-1 h-1 bg-white rounded-full"></div>
+                  </div>
+                )}
+                {/* Non-quarter note spacer */}
+                {!isQuarterNote && (
+                  <div className="h-2 mb-1"></div>
+                )}
+                
+                {/* Step button */}
+                <div
+                  className={className}
+                  onClick={() => onStepToggle(index)}
+                  title={`Step ${index + 1}${isQuarterNote ? ' (Quarter Note)' : ''} - ${isCurrent ? 'Current' : ''}${isActive ? ' Active' : ''}`}
+                >
+                  <div className="w-full h-full flex items-center justify-center text-lg">
+                    {isActive ? '●' : ''}
+                  </div>
                 </div>
               </div>
             );

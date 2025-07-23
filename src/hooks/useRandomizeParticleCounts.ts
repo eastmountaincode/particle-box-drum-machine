@@ -13,11 +13,11 @@ export const useRandomizeParticleCounts = () => {
   useEffect(() => {
     // Only run on client side after hydration
     if (typeof window !== 'undefined') {
-      // Randomize each track's particle count (1-3)
-      setParticleCount1(Math.floor(Math.random() * 3) + 1);
-      setParticleCount2(Math.floor(Math.random() * 3) + 1);
-      setParticleCount3(Math.floor(Math.random() * 3) + 1);
-      setParticleCount4(Math.floor(Math.random() * 3) + 1);
+      // Randomize each track's particle count (0-1)
+      setParticleCount1(Math.floor(Math.random() * 2));
+      setParticleCount2(Math.floor(Math.random() * 2));
+      setParticleCount3(Math.floor(Math.random() * 2));
+      setParticleCount4(Math.floor(Math.random() * 2));
     }
   }, []); // Run once on mount
 }; 

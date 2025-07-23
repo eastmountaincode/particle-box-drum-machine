@@ -99,7 +99,9 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
         // Stop the transport and sequence
         Tone.Transport.stop();
         if (sequenceRef.current) {
-            sequenceRef.current.stop();
+            // Pass 0 to ensure we never pass a negative time value
+            // This prevents floating point precision issues that can cause RangeError
+            sequenceRef.current.stop(0);
         }
         setIsPlaying(false);
 
