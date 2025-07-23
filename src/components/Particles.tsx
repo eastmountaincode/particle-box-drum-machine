@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useAtomValue } from 'jotai';
-import { backgroundColorAtom } from '../store/atoms';
+import { backgroundColorAtom, isPlayingAtom, getFreezeAtom } from '../store/atoms';
 import * as THREE from 'three';
 import { Particle } from './types';
 
@@ -11,6 +11,7 @@ interface ParticlesProps {
   sizeMultiplier?: number;
   particleCount?: number;
   useLighting?: boolean;
+  trackIndex?: number;
 }
 
 export const Particles: React.FC<ParticlesProps> = ({
@@ -18,11 +19,18 @@ export const Particles: React.FC<ParticlesProps> = ({
   speedMultiplier = 1,
   sizeMultiplier = 1,
   particleCount = 15,
-  useLighting = false
+  useLighting = false,
+  trackIndex = 0
 }) => {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const particlesRef = useRef<Particle[]>([]);
   const backgroundColor = useAtomValue(backgroundColorAtom);
+  const globalIsPlaying = useAtomValue(isPlayingAtom);
+  const freezeEnabled = useAtomValue(getFreezeAtom(trackIndex));
+  
+  // Use gray color when frozen, red when live
+  const particleColor = freezeEnabled ? '#808080' : backgroundColor;
+  
   const cubeSize = 2.5;
   const cubeHalf = cubeSize / 2;
   const particleRadius = 0.05;
@@ -105,8 +113,9 @@ export const Particles: React.FC<ParticlesProps> = ({
       const scale = Math.max(minScale, Math.min(maxScale, baseScale + (scaleRange - distance) / scaleRange));
       const actualRadius = particleRadius * scale;
 
-      // Update position with speed multiplier
-      particle.position.add(particle.velocity.clone().multiplyScalar(delta * speedMultiplier));
+      // Update position with speed multiplier AND global play state
+      const effectiveSpeedMultiplier = globalIsPlaying ? speedMultiplier : 0;
+      particle.position.add(particle.velocity.clone().multiplyScalar(delta * effectiveSpeedMultiplier));
 
       // Bounce off walls and trigger ripple effects (using actual particle size)
       if (particle.position.x > cubeHalf - actualRadius || particle.position.x < -cubeHalf + actualRadius) {
@@ -153,7 +162,7 @@ export const Particles: React.FC<ParticlesProps> = ({
       <sphereGeometry args={[particleRadius, 16, 16]} />
       {useLighting ? (
         <meshStandardMaterial 
-          color={backgroundColor}
+          color={particleColor}
           metalness={0.8}
           roughness={0.5}
           transparent={false}

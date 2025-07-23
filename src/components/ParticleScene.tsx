@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { useAtomValue } from 'jotai';
-import { backgroundColorAtom } from '../store/atoms';
+import { backgroundColorAtom, getFreezeAtom, getQuantizationAtom } from '../store/atoms';
 import { CameraTracker } from './CameraTracker';
 import { SceneLighting } from './SceneLighting';
 import { EdgeOnlyCube } from './EdgeOnlyCube';
@@ -20,9 +20,21 @@ export const ParticleScene: React.FC<ParticleSceneProps> = ({
   particleCount,
   useLighting,
   speedRange,
-  sizeRange
+  sizeRange,
+  trackIndex = 0
 }) => {
-  const backgroundColor = useAtomValue(backgroundColorAtom);
+  const defaultBackgroundColor = useAtomValue(backgroundColorAtom);
+  const freezeEnabled = useAtomValue(getFreezeAtom(trackIndex));
+  const quantizationEnabled = useAtomValue(getQuantizationAtom(trackIndex));
+  
+  // Background color logic:
+  // - Quantization ON + Freeze OFF: Red (signal from both particle box and sequencer)
+  // - Quantization OFF + Freeze OFF: Red (signal only from particle box)
+  // - Quantization ON + Freeze ON: Black (signal only from sequencer)
+  // - Quantization OFF + Freeze ON: Red (signal still from particle box, even when frozen)
+  const backgroundColor = (freezeEnabled && quantizationEnabled) ? '#000000' : defaultBackgroundColor;
+  
+  const [isDragging, setIsDragging] = useState(false);
 
   // Generate random initial camera position using spherical coordinates
   const initialCameraPosition = useMemo(() => {
@@ -43,10 +55,16 @@ export const ParticleScene: React.FC<ParticleSceneProps> = ({
     return [position.x, position.y, position.z] as [number, number, number];
   }, []); // Only generate once per component mount
 
+  // Determine cursor style based on drag state
+  const cursorStyle = isDragging ? 'grabbing' : 'grab';
+
   return (
     <Canvas
       camera={{ position: initialCameraPosition, fov: 40 }}
-      style={{ background: backgroundColor }}
+      style={{ 
+        background: backgroundColor,
+        cursor: cursorStyle
+      }}
     >
       <CameraTracker 
         onParamsChange={onParamsChange}
@@ -62,6 +80,8 @@ export const ParticleScene: React.FC<ParticleSceneProps> = ({
         maxDistance={8}
         minAzimuthAngle={-Math.PI / 2}
         maxAzimuthAngle={Math.PI / 2}
+        onStart={() => setIsDragging(true)}
+        onEnd={() => setIsDragging(false)}
       />
       <EdgeOnlyCube flashingWalls={flashingWalls} />
       <Particles
@@ -70,6 +90,7 @@ export const ParticleScene: React.FC<ParticleSceneProps> = ({
         sizeMultiplier={particleParams.size}
         particleCount={particleCount}
         useLighting={useLighting}
+        trackIndex={trackIndex}
       />
     </Canvas>
   );

@@ -11,7 +11,9 @@ const DEFAULT_PARTICLE_COUNT = 3;
 
 export const ParticleBox: React.FC<ParticleBoxProps> = ({ 
   useLighting = false, 
-  particleCount: externalParticleCount 
+  particleCount: externalParticleCount,
+  onWallHit: onQuantizationHit,
+  trackIndex = 0
 }) => {
   const [particleParams, setParticleParams] = useState<ParticleParams>({
     speed: 1,
@@ -24,7 +26,7 @@ export const ParticleBox: React.FC<ParticleBoxProps> = ({
   const particleCount = externalParticleCount ?? internalParticleCount;
 
   const handleWallHit = useCallback((wall: string, position: THREE.Vector3) => {
-    // Trigger wall flash
+    // Trigger wall flash (existing functionality)
     setFlashingWalls(prev => new Set(prev).add(wall));
 
     // Remove flash after 150ms
@@ -35,7 +37,12 @@ export const ParticleBox: React.FC<ParticleBoxProps> = ({
         return newSet;
       });
     }, 150);
-  }, []);
+
+    // Call quantization callback if provided
+    if (onQuantizationHit) {
+      onQuantizationHit();
+    }
+  }, [onQuantizationHit]);
 
   return (
     <div className="w-full h-full bg-black">
@@ -53,6 +60,7 @@ export const ParticleBox: React.FC<ParticleBoxProps> = ({
         useLighting={useLighting}
         speedRange={SPEED_RANGE}
         sizeRange={SIZE_RANGE}
+        trackIndex={trackIndex}
       />
     </div>
   );

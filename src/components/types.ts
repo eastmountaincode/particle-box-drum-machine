@@ -17,6 +17,8 @@ export interface WallHitHandler {
 export interface ParticleBoxProps {
   useLighting?: boolean;
   particleCount?: number;
+  onWallHit?: () => void; // Add this for quantization hits
+  trackIndex?: number;
 }
 
 export interface ParticleStatsProps {
@@ -40,4 +42,5 @@ export interface ParticleSceneProps {
   useLighting: boolean;
   speedRange: [number, number];
   sizeRange: [number, number];
+  trackIndex?: number;
 }

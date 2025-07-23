@@ -5,16 +5,29 @@ import { ControlPanel } from '@/components/ControlPanel';
 import { DrumSequencerControls } from '@/components/DrumSequencerControls';
 import { SequencerDisplay } from '@/components/SequencerDisplay';
 import { useAtom } from 'jotai';
-import { getParticleCountAtom, getLightingAtom, currentStepAtom } from '@/store/atoms';
-import { useState } from 'react';
+import { getParticleCountAtom, getLightingAtom, currentStepAtom, isPlayingAtom, getSequencerStepsAtom, getQuantizationAtom } from '@/store/atoms';
+import { useState, useEffect } from 'react';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
+import { useRandomizeSamples } from '@/hooks/useRandomizeSamples';
+import { useRandomizeParticleCounts } from '@/hooks/useRandomizeParticleCounts';
+import { useQuantization } from '@/hooks/useQuantization';
 
 export default function Home() {
   const [bpm, setBpm] = useState(120);
   const [currentStep] = useAtom(currentStepAtom);
+  const [globalIsPlaying, setGlobalIsPlaying] = useAtom(isPlayingAtom);
   const totalSteps = 16;
   
   const { isPlaying, start, stop } = useAudioEngine(bpm);
+  
+  // Sync audio engine state with global atom
+  useEffect(() => {
+    setGlobalIsPlaying(isPlaying);
+  }, [isPlaying, setGlobalIsPlaying]);
+  
+  // Randomize samples and particle counts on client-side mount
+  useRandomizeSamples();
+  useRandomizeParticleCounts();
 
   const handlePlayStop = async () => {
     if (isPlaying) {
@@ -42,7 +55,7 @@ export default function Home() {
         {/* Track Rows */}
         <div className="flex-1 flex flex-col gap-4">
           {[1, 2, 3, 4].map((row, index) => (
-            <TrackRow key={row} index={index} trackNumber={row} currentStep={currentStep} />
+            <TrackRow key={row} index={index} trackNumber={row} currentStep={currentStep} bpm={bpm} />
           ))}
         </div>
       </div>
@@ -50,10 +63,15 @@ export default function Home() {
   );
 }
 
-const TrackRow: React.FC<{ index: number; trackNumber: number; currentStep: number }> = ({ index, trackNumber, currentStep }) => {
+const TrackRow: React.FC<{ index: number; trackNumber: number; currentStep: number; bpm: number }> = ({ index, trackNumber, currentStep, bpm }) => {
   const [particleCount, setParticleCount] = useAtom(getParticleCountAtom(index));
   const [useLighting, setUseLighting] = useAtom(getLightingAtom(index));
-  const [steps, setSteps] = useState<boolean[]>(new Array(16).fill(false));
+  const [steps, setSteps] = useAtom(getSequencerStepsAtom(index));
+
+  const { registerHit } = useQuantization({
+    trackIndex: index,
+    bpm
+  });
 
   const handleStepToggle = (stepIndex: number) => {
     const newSteps = [...steps];
@@ -74,6 +92,8 @@ const TrackRow: React.FC<{ index: number; trackNumber: number; currentStep: numb
         <ParticleBox
           useLighting={useLighting}
           particleCount={particleCount}
+          onWallHit={registerHit}
+          trackIndex={index}
         />
       </div>
 
