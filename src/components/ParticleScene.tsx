@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { useAtomValue } from 'jotai';
-import { backgroundColorAtom, getFreezeAtom, getQuantizationAtom } from '../store/atoms';
+import { backgroundColorAtom, getFreezeAtom, getQuantizationAtom, getMuteAtom } from '../store/atoms';
 import { CameraTracker } from './CameraTracker';
 import { SceneLighting } from './SceneLighting';
 import { EdgeOnlyCube } from './EdgeOnlyCube';
@@ -26,13 +26,15 @@ export const ParticleScene: React.FC<ParticleSceneProps> = ({
   const defaultBackgroundColor = useAtomValue(backgroundColorAtom);
   const freezeEnabled = useAtomValue(getFreezeAtom(trackIndex));
   const quantizationEnabled = useAtomValue(getQuantizationAtom(trackIndex));
+  const muteEnabled = useAtomValue(getMuteAtom(trackIndex));
   
   // Background color logic:
+  // - If MUTED: Always black (everything keeps running in background, just no visual)
   // - Quantization ON + Freeze OFF: Red (signal from both particle box and sequencer)
   // - Quantization OFF + Freeze OFF: Red (signal only from particle box)
   // - Quantization ON + Freeze ON: Black (signal only from sequencer)
   // - Quantization OFF + Freeze ON: Red (signal still from particle box, even when frozen)
-  const backgroundColor = (freezeEnabled && quantizationEnabled) ? '#000000' : defaultBackgroundColor;
+  const backgroundColor = muteEnabled ? '#000000' : (freezeEnabled && quantizationEnabled) ? '#000000' : defaultBackgroundColor;
   
   const [isDragging, setIsDragging] = useState(false);
 
@@ -83,15 +85,19 @@ export const ParticleScene: React.FC<ParticleSceneProps> = ({
         onStart={() => setIsDragging(true)}
         onEnd={() => setIsDragging(false)}
       />
-      <EdgeOnlyCube flashingWalls={flashingWalls} />
-      <Particles
-        onWallHit={onWallHit}
-        speedMultiplier={particleParams.speed}
-        sizeMultiplier={particleParams.size}
-        particleCount={particleCount}
-        useLighting={useLighting}
-        trackIndex={trackIndex}
-      />
+      {!muteEnabled && (
+        <>
+          <EdgeOnlyCube flashingWalls={flashingWalls} />
+          <Particles
+            onWallHit={onWallHit}
+            speedMultiplier={particleParams.speed}
+            sizeMultiplier={particleParams.size}
+            particleCount={particleCount}
+            useLighting={useLighting}
+            trackIndex={trackIndex}
+          />
+        </>
+      )}
     </Canvas>
   );
 };

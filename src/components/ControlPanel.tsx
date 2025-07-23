@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAtom } from 'jotai';
-import { getSampleIndexAtom, getQuantizationAtom, getFreezeAtom } from '@/store/atoms';
+import { getSampleIndexAtom, getQuantizationAtom, getFreezeAtom, getMuteAtom } from '@/store/atoms';
 import { getInstrumentForTrack, getSampleName, getSampleCount } from '@/utils/samples';
 
 interface ControlPanelProps {
@@ -23,6 +23,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   const [sampleIndex, setSampleIndex] = useAtom(getSampleIndexAtom(trackNumber - 1));
   const [quantizationEnabled, setQuantizationEnabled] = useAtom(getQuantizationAtom(trackNumber - 1));
   const [freezeEnabled, setFreezeEnabled] = useAtom(getFreezeAtom(trackNumber - 1));
+  const [muteEnabled, setMuteEnabled] = useAtom(getMuteAtom(trackNumber - 1));
   const instrument = getInstrumentForTrack(trackNumber - 1);
   const currentSample = getSampleName(instrument, sampleIndex);
   const sampleCount = getSampleCount(instrument);
@@ -55,8 +56,24 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     setFreezeEnabled(!freezeEnabled);
   };
 
+  const handleMuteToggle = () => {
+    setMuteEnabled(!muteEnabled);
+  };
+
   return (
     <div className="w-full h-full bg-black border border-white border-opacity-50 p-2 flex flex-col gap-2">
+      {/* Mute button */}
+      <button 
+        onClick={handleMuteToggle}
+        className={`flex-1 text-xs px-2 border border-white border-opacity-50 cursor-pointer ${
+          muteEnabled 
+            ? 'bg-white text-black' 
+            : 'bg-black text-white hover:bg-white hover:text-black'
+        }`}
+      >
+        MUTE {muteEnabled ? 'ON' : 'OFF'}
+      </button>
+
       {/* Freeze pattern button */}
       <button 
         onClick={handleFreezeToggle}

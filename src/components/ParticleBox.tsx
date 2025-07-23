@@ -4,6 +4,7 @@ import React, { useCallback, useState } from 'react';
 import * as THREE from 'three';
 import { ParticleScene } from './ParticleScene';
 import { ParticleParams, ParticleBoxProps } from './types';
+import { useCollisionPlayback } from '@/hooks/useCollisionPlayback';
 
 const SPEED_RANGE: [number, number] = [0.2, 4];
 const SIZE_RANGE: [number, number] = [2, 10];
@@ -21,6 +22,9 @@ export const ParticleBox: React.FC<ParticleBoxProps> = ({
   });
   const [flashingWalls, setFlashingWalls] = useState<Set<string>>(new Set());
   const [internalParticleCount, setInternalParticleCount] = useState<number>(DEFAULT_PARTICLE_COUNT);
+  
+  // Use collision playback hook for immediate audio
+  const { onCollisionHit } = useCollisionPlayback(trackIndex);
 
   // Use external particle count if provided, otherwise use internal state
   const particleCount = externalParticleCount ?? internalParticleCount;
@@ -38,11 +42,14 @@ export const ParticleBox: React.FC<ParticleBoxProps> = ({
       });
     }, 150);
 
-    // Call quantization callback if provided
+    // Call quantization callback if provided (for building patterns)
     if (onQuantizationHit) {
       onQuantizationHit();
     }
-  }, [onQuantizationHit]);
+    
+    // Call collision playback (for immediate audio when quantization is off)
+    onCollisionHit();
+  }, [onQuantizationHit, onCollisionHit]);
 
   return (
     <div className="w-full h-full bg-black">

@@ -28,6 +28,12 @@ export const freeze2Atom = atom(false);
 export const freeze3Atom = atom(false);
 export const freeze4Atom = atom(false);
 
+// Mute atoms for each track (1-4)
+export const mute1Atom = atom(false);
+export const mute2Atom = atom(false);
+export const mute3Atom = atom(false);
+export const mute4Atom = atom(false);
+
 // Background color atom
 export const backgroundColorAtom = atom('#ff0000');
 
@@ -103,6 +109,16 @@ export const getSequencerStepsAtom = (index: number) => {
     case 1: return sequencerSteps2Atom;
     case 2: return sequencerSteps3Atom;
     case 3: return sequencerSteps4Atom;
+    default: throw new Error(`Invalid track index: ${index}`);
+  }
+};
+
+export const getMuteAtom = (index: number) => {
+  switch (index) {
+    case 0: return mute1Atom;
+    case 1: return mute2Atom;
+    case 2: return mute3Atom;
+    case 3: return mute4Atom;
     default: throw new Error(`Invalid track index: ${index}`);
   }
 }; 

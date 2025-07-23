@@ -67,8 +67,6 @@ export const useQuantization = ({ trackIndex, bpm }: QuantizationConfig) => {
     
     // Register this hit for the next step
     pendingHitsRef.current.set(nextStep, true);
-    
-    console.log(`Hit registered for track ${trackIndex + 1}, will activate step ${nextStep + 1} (current: ${currentStep + 1})`);
   }, [quantizationEnabled, isPlaying, freezeEnabled, currentStep, trackIndex]);
 
   // Clear all pending hits when stopping or freezing

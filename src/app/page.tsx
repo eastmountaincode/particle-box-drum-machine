@@ -11,9 +11,10 @@ import { useAudioEngine } from '@/hooks/useAudioEngine';
 import { useRandomizeSamples } from '@/hooks/useRandomizeSamples';
 import { useRandomizeParticleCounts } from '@/hooks/useRandomizeParticleCounts';
 import { useQuantization } from '@/hooks/useQuantization';
+import { useTrackSamplePlayback } from '@/hooks/useTrackSamplePlayback';
 
 export default function Home() {
-  const [bpm, setBpm] = useState(120);
+  const [bpm, setBpm] = useState(60);
   const [currentStep] = useAtom(currentStepAtom);
   const [globalIsPlaying, setGlobalIsPlaying] = useAtom(isPlayingAtom);
   const totalSteps = 16;
@@ -72,6 +73,9 @@ const TrackRow: React.FC<{ index: number; trackNumber: number; currentStep: numb
     trackIndex: index,
     bpm
   });
+
+  // Per-track sample playback (listens to global transport)
+  useTrackSamplePlayback(index);
 
   const handleStepToggle = (stepIndex: number) => {
     const newSteps = [...steps];
