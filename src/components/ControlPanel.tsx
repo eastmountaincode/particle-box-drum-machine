@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useAtom } from 'jotai';
 import { getSampleIndexAtom, getQuantizationAtom, getFreezeAtom, getMuteAtom, getTrackVolumeAtom } from '@/store/atoms';
 import { getInstrumentForTrack, getSampleName, getSampleCount } from '@/utils/samples';

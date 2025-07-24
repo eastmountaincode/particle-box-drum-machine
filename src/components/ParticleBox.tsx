@@ -21,7 +21,7 @@ export const ParticleBox: React.FC<ParticleBoxProps> = ({
     size: 1,
   });
   const [flashingWalls, setFlashingWalls] = useState<Set<string>>(new Set());
-  const [internalParticleCount, setInternalParticleCount] = useState<number>(DEFAULT_PARTICLE_COUNT);
+  const [internalParticleCount, _] = useState<number>(DEFAULT_PARTICLE_COUNT);
   
   // Use collision playback hook for immediate audio
   const { onCollisionHit } = useCollisionPlayback(trackIndex);

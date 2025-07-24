@@ -5,7 +5,7 @@ import { ControlPanel } from '@/components/ControlPanel';
 import { GlobalControls } from '@/components/GlobalControls';
 import { SequencerDisplay } from '@/components/SequencerDisplay';
 import { useAtom } from 'jotai';
-import { getParticleCountAtom, getLightingAtom, currentStepAtom, isPlayingAtom, getSequencerStepsAtom, getQuantizationAtom } from '@/store/atoms';
+import { getParticleCountAtom, getLightingAtom, currentStepAtom, isPlayingAtom, getSequencerStepsAtom } from '@/store/atoms';
 import { useState, useEffect } from 'react';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
 import { useRandomizeSamples } from '@/hooks/useRandomizeSamples';
@@ -16,8 +16,7 @@ import { useTrackSamplePlayback } from '@/hooks/useTrackSamplePlayback';
 export default function Home() {
     const [bpm, setBpm] = useState(60);
     const [currentStep] = useAtom(currentStepAtom);
-    const [globalIsPlaying, setGlobalIsPlaying] = useAtom(isPlayingAtom);
-    const totalSteps = 16;
+    const [_, setGlobalIsPlaying] = useAtom(isPlayingAtom);
 
     const { isPlaying, start, stop } = useAudioEngine(bpm);
 
@@ -46,7 +45,6 @@ export default function Home() {
                     <GlobalControls
                         isPlaying={isPlaying}
                         currentStep={currentStep}
-                        totalSteps={totalSteps}
                         bpm={bpm}
                         onPlayStop={handlePlayStop}
                         onBpmChange={setBpm}

@@ -11,7 +11,6 @@ const MAX_BPM = 300;
 interface GlobalControlsProps {
     isPlaying: boolean;
     currentStep: number;
-    totalSteps: number;
     bpm: number;
     onPlayStop: () => void;
     onBpmChange: (bpm: number) => void;
@@ -20,7 +19,6 @@ interface GlobalControlsProps {
 export const GlobalControls: React.FC<GlobalControlsProps> = ({
     isPlaying,
     currentStep,
-    totalSteps,
     bpm,
     onPlayStop,
     onBpmChange
