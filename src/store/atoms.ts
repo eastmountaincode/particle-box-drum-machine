@@ -12,9 +12,9 @@ export const particleCount4Atom = atom(3);
 
 // Lighting state atoms for each track (1-4)
 export const lighting1Atom = atom(false);
-export const lighting2Atom = atom(false);
-export const lighting3Atom = atom(false);
-export const lighting4Atom = atom(false);
+export const lighting2Atom = atom(true);
+export const lighting3Atom = atom(true);
+export const lighting4Atom = atom(true);
 
 // Quantization state atoms for each track (1-4)
 export const quantization1Atom = atom(true);
@@ -51,7 +51,7 @@ export const globalVolumeAtom = atom(0.5);
 // Per-track volume atoms (1-4)
 export const trackVolume1Atom = atom(0.8);
 export const trackVolume2Atom = atom(0.8);
-export const trackVolume3Atom = atom(0.8);
+export const trackVolume3Atom = atom(0.3);
 export const trackVolume4Atom = atom(0.8);
 
 // Sequencer step atoms for each track (1-4) - 16 steps each

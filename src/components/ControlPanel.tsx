@@ -13,6 +13,9 @@ interface ControlPanelProps {
   onParticleCountChange?: (count: number) => void;
 }
 
+const MAX_PARTICLE_COUNT = 20;
+const MIN_PARTICLE_COUNT = 0;
+
 export const ControlPanel: React.FC<ControlPanelProps> = ({
   trackNumber = 1,
   useLighting = false,
@@ -30,13 +33,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   const sampleCount = getSampleCount(instrument);
 
   const handleParticleDecrease = () => {
-    if (onParticleCountChange && particleCount > 0) {
+    if (onParticleCountChange && particleCount > MIN_PARTICLE_COUNT) {
       onParticleCountChange(particleCount - 1);
     }
   };
 
   const handleParticleIncrease = () => {
-    if (onParticleCountChange && particleCount < 10) {
+    if (onParticleCountChange && particleCount < MAX_PARTICLE_COUNT) {
       onParticleCountChange(particleCount + 1);
     }
   };
@@ -94,7 +97,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           <button
             onClick={handleParticleDecrease}
             className="flex-1 h-full bg-black hover:bg-white hover:text-black text-white text-xs border-r border-white border-opacity-50 cursor-pointer"
-            disabled={particleCount <= 0}
+            disabled={particleCount <= MIN_PARTICLE_COUNT}
           >
             -
           </button>
@@ -104,7 +107,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           <button
             onClick={handleParticleIncrease}
             className="flex-1 h-full bg-black hover:bg-white hover:text-black text-white text-xs cursor-pointer"
-            disabled={particleCount >= 10}
+            disabled={particleCount >= MAX_PARTICLE_COUNT}
           >
             +
           </button>

@@ -21,6 +21,8 @@ export const useDrumSamples = (trackIndex: number): UseDrumSamplesReturn => {
   const trackVolume = useAtomValue(getTrackVolumeAtom(trackIndex));
   const playerRef = useRef<Tone.Player | null>(null);
   const reverbRef = useRef<Tone.Reverb | null>(null);
+  const dryGainRef = useRef<Tone.Gain | null>(null);
+  const wetGainRef = useRef<Tone.Gain | null>(null);
   const isLoadedRef = useRef(false);
   const currentSampleRef = useRef<string>('');
 
@@ -29,17 +31,39 @@ export const useDrumSamples = (trackIndex: number): UseDrumSamplesReturn => {
   const sampleName = getSampleName(instrument, sampleIndex);
   const samplePath = getSamplePath(instrument, sampleName);
 
-  // Initialize reverb effect
+  // Audio routing function - control dry/wet mix with gain levels
+  const updateAudioRouting = useCallback(() => {
+    if (dryGainRef.current && wetGainRef.current) {
+      if (lightingEnabled) {
+        // Reverb on: dry signal off, wet signal on
+        dryGainRef.current.gain.value = 0;
+        wetGainRef.current.gain.value = 1;
+      } else {
+        // Reverb off: dry signal on, wet signal off  
+        dryGainRef.current.gain.value = 1;
+        wetGainRef.current.gain.value = 0;
+      }
+    }
+  }, [lightingEnabled]);
+
+  // Initialize audio routing with separate dry/wet paths
   useEffect(() => {
-    if (!reverbRef.current) {
+    if (!reverbRef.current || !dryGainRef.current || !wetGainRef.current) {
+      // Create dry path (direct to destination)
+      dryGainRef.current = new Tone.Gain(lightingEnabled ? 0 : 1).toDestination();
+      
+      // Create wet path (through reverb to destination)
+      wetGainRef.current = new Tone.Gain(lightingEnabled ? 1 : 0).toDestination();
+      
       // Use room size to add pre-delay for spatial effect
       const preDelay = reverbRoomSize * 0.1; // 0-0.1 seconds pre-delay based on room size
       
       reverbRef.current = new Tone.Reverb({
         decay: reverbDecay,
-        wet: reverbWet,
+        wet: reverbWet, // Always full wet for the wet path
         preDelay: preDelay
-      }).toDestination();
+      });
+      reverbRef.current.connect(wetGainRef.current);
     }
 
     return () => {
@@ -47,17 +71,29 @@ export const useDrumSamples = (trackIndex: number): UseDrumSamplesReturn => {
         reverbRef.current.dispose();
         reverbRef.current = null;
       }
+      if (dryGainRef.current) {
+        dryGainRef.current.dispose();
+        dryGainRef.current = null;
+      }
+      if (wetGainRef.current) {
+        wetGainRef.current.dispose();
+        wetGainRef.current = null;
+      }
     };
   }, []);
 
-  // Update reverb parameters when they change
+  // Update reverb wet/decay parameters (can be changed without recreation)
   useEffect(() => {
     if (reverbRef.current) {
       reverbRef.current.wet.value = reverbWet;
       reverbRef.current.decay = reverbDecay;
-      
-      // For room size, we'll update the pre-delay
-      // Note: Pre-delay can't be changed after creation in Tone.js, so we recreate the reverb
+    }
+  }, [reverbWet, reverbDecay]);
+
+  // Update reverb room size (requires recreation due to pre-delay)
+  useEffect(() => {
+    if (reverbRef.current && wetGainRef.current) {
+      // For room size, we need to recreate the reverb due to pre-delay
       reverbRef.current.dispose();
       
       const preDelay = reverbRoomSize * 0.1;
@@ -65,15 +101,15 @@ export const useDrumSamples = (trackIndex: number): UseDrumSamplesReturn => {
         decay: reverbDecay,
         wet: reverbWet,
         preDelay: preDelay
-      }).toDestination();
+      });
+      reverbRef.current.connect(wetGainRef.current);
 
-      // Reconnect the player if it exists
-      if (playerRef.current && lightingEnabled) {
-        playerRef.current.disconnect();
+      // Reconnect player to the new reverb
+      if (playerRef.current) {
         playerRef.current.connect(reverbRef.current);
       }
     }
-  }, [reverbWet, reverbDecay, reverbRoomSize, lightingEnabled]);
+  }, [reverbRoomSize, reverbDecay, reverbWet]);
 
   // Load sample when it changes
   useEffect(() => {
@@ -103,8 +139,11 @@ export const useDrumSamples = (trackIndex: number): UseDrumSamplesReturn => {
           }
         });
 
-        // Connect to destination (we'll handle routing in the lighting effect)
-        playerRef.current.toDestination();
+        // Connect to both dry and wet paths: player splits to dry gain and reverb
+        if (dryGainRef.current && reverbRef.current) {
+          playerRef.current.connect(dryGainRef.current);
+          playerRef.current.connect(reverbRef.current);
+        }
 
       } catch (error) {
         console.error(`Error creating player for ${samplePath}:`, error);
@@ -124,21 +163,10 @@ export const useDrumSamples = (trackIndex: number): UseDrumSamplesReturn => {
     };
   }, [samplePath]);
 
-  // Update audio routing based on lighting state
+  // Update audio routing when lighting state changes
   useEffect(() => {
-    if (playerRef.current && reverbRef.current) {
-      // Disconnect all existing connections
-      playerRef.current.disconnect();
-      
-      if (lightingEnabled) {
-        // Route through reverb when lighting is on
-        playerRef.current.connect(reverbRef.current);
-      } else {
-        // Direct to destination when lighting is off
-        playerRef.current.toDestination();
-      }
-    }
-  }, [lightingEnabled]);
+    updateAudioRouting();
+  }, [updateAudioRouting]);
 
   const playSample = useCallback((velocity: number = 1) => {
     if (playerRef.current && isLoadedRef.current) {

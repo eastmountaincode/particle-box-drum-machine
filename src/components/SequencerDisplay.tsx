@@ -27,7 +27,8 @@ export const SequencerDisplay: React.FC<SequencerDisplayProps> = ({
   // - Quantization OFF + Freeze OFF: Black (signal only from particle box)  
   // - Quantization ON + Freeze ON: Red (signal only from sequencer)
   // - Quantization OFF + Freeze ON: Black (signal only from particle box)
-  const backgroundColor = muteEnabled ? 'bg-black' : (quantizationEnabled ? 'bg-red-600' : 'bg-black');
+  //const backgroundColor = muteEnabled ? 'bg-black' : (quantizationEnabled ? 'bg-red-600' : 'bg-black');
+  const backgroundColor = 'bg-black';
   const isRedBackground = quantizationEnabled;
   
   return (
@@ -50,7 +51,7 @@ export const SequencerDisplay: React.FC<SequencerDisplayProps> = ({
               className += 'bg-white ';
               // Active dot color should match the sequencer background theme:
               // If sequencer background is red, use red dot; if black background, use black dot
-              textColor = (isActiveAndCurrent && isRedBackground) ? 'text-red-600' : 'text-black';
+              textColor = (isActiveAndCurrent && isRedBackground) ? 'text-black' : 'text-black';
             } else {
               // Non-current steps get transparent background with hover
               className += 'bg-transparent hover:bg-gray-800 ';
