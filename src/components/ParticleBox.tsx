@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { ParticleScene } from './ParticleScene';
 import { ParticleParams, ParticleBoxProps } from './types';
@@ -26,21 +26,43 @@ export const ParticleBox: React.FC<ParticleBoxProps> = ({
   // Use collision playback hook for immediate audio
   const { onCollisionHit } = useCollisionPlayback(trackIndex);
 
+  // Store timeout references to prevent memory leaks
+  const timeoutRefsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
   // Use external particle count if provided, otherwise use internal state
   const particleCount = externalParticleCount ?? internalParticleCount;
+
+  // Cleanup all timeouts on unmount
+  useEffect(() => {
+    return () => {
+      timeoutRefsRef.current.forEach(timeout => clearTimeout(timeout));
+      timeoutRefsRef.current.clear();
+    };
+  }, []);
 
   const handleWallHit = useCallback((wall: string, position: THREE.Vector3) => {
     // Trigger wall flash (existing functionality)
     setFlashingWalls(prev => new Set(prev).add(wall));
 
-    // Remove flash after 150ms
-    setTimeout(() => {
+    // Clear any existing timeout for this wall to prevent accumulation
+    const existingTimeout = timeoutRefsRef.current.get(wall);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
+
+    // Set new timeout and store reference
+    const timeout = setTimeout(() => {
       setFlashingWalls(prev => {
         const newSet = new Set(prev);
         newSet.delete(wall);
         return newSet;
       });
+      // Clean up the timeout reference
+      timeoutRefsRef.current.delete(wall);
     }, 150);
+    
+    // Store the timeout reference
+    timeoutRefsRef.current.set(wall, timeout);
 
     // Call quantization callback if provided (for building patterns)
     if (onQuantizationHit) {
