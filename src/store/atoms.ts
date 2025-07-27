@@ -4,6 +4,9 @@ import { SAMPLE_DATA } from '@/utils/samples';
 // Global play state atom
 export const isPlayingAtom = atom(false);
 
+// Visual mode atom - when true, shows minimal interface
+export const visualModeAtom = atom(false);
+
 // Particle count atoms for each track (1-4) - will be randomized on client
 export const particleCount1Atom = atom(3);
 export const particleCount2Atom = atom(3);
@@ -41,9 +44,9 @@ export const backgroundColorAtom = atom('#ff0000');
 export const currentStepAtom = atom(0);
 
 // Global reverb parameters
-export const reverbWetAtom = atom(0.5);
-export const reverbDecayAtom = atom(2.5);
-export const reverbRoomSizeAtom = atom(0.5);
+export const reverbWetAtom = atom(0.4);
+export const reverbDecayAtom = atom(1.5);
+export const reverbRoomSizeAtom = atom(0.3);
 
 // Global volume parameter
 export const globalVolumeAtom = atom(0.5);

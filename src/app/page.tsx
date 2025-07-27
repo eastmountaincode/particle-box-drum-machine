@@ -5,7 +5,7 @@ import { ControlPanel } from '@/components/ControlPanel';
 import { GlobalControls } from '@/components/GlobalControls';
 import { SequencerDisplay } from '@/components/SequencerDisplay';
 import { useAtom } from 'jotai';
-import { getParticleCountAtom, getLightingAtom, currentStepAtom, isPlayingAtom, getSequencerStepsAtom } from '@/store/atoms';
+import { getParticleCountAtom, getLightingAtom, currentStepAtom, isPlayingAtom, getSequencerStepsAtom, visualModeAtom } from '@/store/atoms';
 import { useState, useEffect } from 'react';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
 import { useRandomizeSamples } from '@/hooks/useRandomizeSamples';
@@ -14,11 +14,12 @@ import { useQuantization } from '@/hooks/useQuantization';
 import { useTrackSamplePlayback } from '@/hooks/useTrackSamplePlayback';
 
 export default function Home() {
-    const [bpm, setBpm] = useState(60);
+    const [bpm, setBpm] = useState(120);
     const [currentStep] = useAtom(currentStepAtom);
     const [_, setGlobalIsPlaying] = useAtom(isPlayingAtom);
+    const [visualMode] = useAtom(visualModeAtom);
 
-    const { isPlaying, start, stop } = useAudioEngine(bpm);
+    const { isPlaying, start, stop, registerStepCallback, unregisterStepCallback } = useAudioEngine(bpm);
 
     // Sync audio engine state with global atom
     useEffect(() => {
@@ -52,9 +53,18 @@ export default function Home() {
                 </div>
 
                 {/* Track Rows */}
-                <div className="flex-1 flex flex-col gap-4">
+                <div className={visualMode ? "flex flex-col gap-4" : "flex-1 flex flex-col gap-4"}>
                     {[1, 2, 3, 4].map((row, index) => (
-                        <TrackRow key={row} index={index} trackNumber={row} currentStep={currentStep} bpm={bpm} />
+                        <TrackRow 
+                            key={row} 
+                            index={index} 
+                            trackNumber={row} 
+                            currentStep={currentStep} 
+                            bpm={bpm}
+                            registerStepCallback={registerStepCallback}
+                            unregisterStepCallback={unregisterStepCallback}
+                            visualMode={visualMode}
+                        />
                     ))}
                 </div>
             </div>
@@ -62,7 +72,15 @@ export default function Home() {
     );
 }
 
-const TrackRow: React.FC<{ index: number; trackNumber: number; currentStep: number; bpm: number }> = ({ index, trackNumber, currentStep, bpm }) => {
+const TrackRow: React.FC<{ 
+    index: number; 
+    trackNumber: number; 
+    currentStep: number; 
+    bpm: number;
+    registerStepCallback: (trackIndex: number, callback: (step: number) => void) => void;
+    unregisterStepCallback: (trackIndex: number) => void;
+    visualMode: boolean;
+}> = ({ index, trackNumber, currentStep, bpm, registerStepCallback, unregisterStepCallback, visualMode }) => {
     const [particleCount, setParticleCount] = useAtom(getParticleCountAtom(index));
     const [useLighting, setUseLighting] = useAtom(getLightingAtom(index));
     const [steps, setSteps] = useAtom(getSequencerStepsAtom(index));
@@ -72,8 +90,17 @@ const TrackRow: React.FC<{ index: number; trackNumber: number; currentStep: numb
         bpm
     });
 
-    // Per-track sample playback (listens to global transport)
-    useTrackSamplePlayback(index);
+    // Per-track sample playback - now returns a callback instead of using useEffect
+    const { onStepTriggered } = useTrackSamplePlayback(index);
+
+    // Register the step callback with the audio engine
+    useEffect(() => {
+        registerStepCallback(index, onStepTriggered);
+        
+        return () => {
+            unregisterStepCallback(index);
+        };
+    }, [index, onStepTriggered, registerStepCallback, unregisterStepCallback]);
 
     const handleStepToggle = (stepIndex: number) => {
         const newSteps = [...steps];
@@ -81,6 +108,30 @@ const TrackRow: React.FC<{ index: number; trackNumber: number; currentStep: numb
         setSteps(newSteps);
     };
 
+    if (visualMode) {
+        // Visual mode: Only show particle boxes, same size as tech mode
+        return (
+            <div className="flex justify-center items-center" style={{ height: 'calc((100vh - 10rem) / 4)' }}>
+                <div
+                    className="border border-white border-opacity-50 flex-shrink-0"
+                    style={{
+                        // Same size as tech mode
+                        width: 'min(calc(25vh - 1rem), calc(25vw - 1rem), calc((100vh - 10rem) / 4))',
+                        height: 'min(calc(25vh - 1rem), calc(25vw - 1rem), calc((100vh - 10rem) / 4))'
+                    }}
+                >
+                    <ParticleBox
+                        useLighting={useLighting}
+                        particleCount={particleCount}
+                        onWallHit={registerHit}
+                        trackIndex={index}
+                    />
+                </div>
+            </div>
+        );
+    }
+
+    // Normal mode: Show all controls
     return (
         <div className="flex-1 flex gap-4">
             {/* Square particle box container */}

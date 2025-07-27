@@ -19,6 +19,7 @@ export const useDrumSamples = (trackIndex: number): UseDrumSamplesReturn => {
   const reverbRoomSize = useAtomValue(reverbRoomSizeAtom);
   const globalVolume = useAtomValue(globalVolumeAtom);
   const trackVolume = useAtomValue(getTrackVolumeAtom(trackIndex));
+  
   const playerRef = useRef<Tone.Player | null>(null);
   const reverbRef = useRef<Tone.Reverb | null>(null);
   const dryGainRef = useRef<Tone.Gain | null>(null);
@@ -48,22 +49,40 @@ export const useDrumSamples = (trackIndex: number): UseDrumSamplesReturn => {
 
   // Initialize audio routing with separate dry/wet paths
   useEffect(() => {
-    if (!reverbRef.current || !dryGainRef.current || !wetGainRef.current) {
-      // Create dry path (direct to destination)
-      dryGainRef.current = new Tone.Gain(lightingEnabled ? 0 : 1).toDestination();
-      
-      // Create wet path (through reverb to destination)
-      wetGainRef.current = new Tone.Gain(lightingEnabled ? 1 : 0).toDestination();
-      
-      // Use room size to add pre-delay for spatial effect
-      const preDelay = reverbRoomSize * 0.1; // 0-0.1 seconds pre-delay based on room size
-      
-      reverbRef.current = new Tone.Reverb({
-        decay: reverbDecay,
-        wet: reverbWet, // Always full wet for the wet path
-        preDelay: preDelay
-      });
-      reverbRef.current.connect(wetGainRef.current);
+    // Clean up existing nodes
+    if (reverbRef.current) {
+      reverbRef.current.dispose();
+      reverbRef.current = null;
+    }
+    if (dryGainRef.current) {
+      dryGainRef.current.dispose();
+      dryGainRef.current = null;
+    }
+    if (wetGainRef.current) {
+      wetGainRef.current.dispose();
+      wetGainRef.current = null;
+    }
+
+    // Create dry path (direct to destination)
+    dryGainRef.current = new Tone.Gain(lightingEnabled ? 0 : 1).toDestination();
+    
+    // Create wet path (through reverb to destination)  
+    wetGainRef.current = new Tone.Gain(lightingEnabled ? 1 : 0).toDestination();
+    
+    // Create reverb with current settings
+    const preDelay = reverbRoomSize * 0.1;
+    reverbRef.current = new Tone.Reverb({
+      decay: reverbDecay,
+      wet: reverbWet,
+      preDelay: preDelay
+    });
+    reverbRef.current.connect(wetGainRef.current);
+
+    // Reconnect player if it exists
+    if (playerRef.current) {
+      playerRef.current.disconnect();
+      playerRef.current.connect(dryGainRef.current);
+      playerRef.current.connect(reverbRef.current);
     }
 
     return () => {
@@ -80,36 +99,7 @@ export const useDrumSamples = (trackIndex: number): UseDrumSamplesReturn => {
         wetGainRef.current = null;
       }
     };
-  }, []);
-
-  // Update reverb wet/decay parameters (can be changed without recreation)
-  useEffect(() => {
-    if (reverbRef.current) {
-      reverbRef.current.wet.value = reverbWet;
-      reverbRef.current.decay = reverbDecay;
-    }
-  }, [reverbWet, reverbDecay]);
-
-  // Update reverb room size (requires recreation due to pre-delay)
-  useEffect(() => {
-    if (reverbRef.current && wetGainRef.current) {
-      // For room size, we need to recreate the reverb due to pre-delay
-      reverbRef.current.dispose();
-      
-      const preDelay = reverbRoomSize * 0.1;
-      reverbRef.current = new Tone.Reverb({
-        decay: reverbDecay,
-        wet: reverbWet,
-        preDelay: preDelay
-      });
-      reverbRef.current.connect(wetGainRef.current);
-
-      // Reconnect player to the new reverb
-      if (playerRef.current) {
-        playerRef.current.connect(reverbRef.current);
-      }
-    }
-  }, [reverbRoomSize, reverbDecay, reverbWet]);
+  }, [lightingEnabled, reverbWet, reverbDecay, reverbRoomSize]);
 
   // Load sample when it changes
   useEffect(() => {
@@ -163,11 +153,6 @@ export const useDrumSamples = (trackIndex: number): UseDrumSamplesReturn => {
     };
   }, [samplePath]);
 
-  // Update audio routing when lighting state changes
-  useEffect(() => {
-    updateAudioRouting();
-  }, [updateAudioRouting]);
-
   const playSample = useCallback((velocity: number = 1) => {
     if (playerRef.current && isLoadedRef.current) {
       try {
@@ -184,7 +169,7 @@ export const useDrumSamples = (trackIndex: number): UseDrumSamplesReturn => {
         console.error('Error playing sample:', error);
       }
     }
-  }, [samplePath, globalVolume, trackVolume]);
+  }, [globalVolume, trackVolume]);
 
   return {
     playSample,

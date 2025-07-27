@@ -9,6 +9,8 @@ interface UseAudioEngineReturn {
     isPlaying: boolean;
     start: () => Promise<void>;
     stop: () => void;
+    registerStepCallback: (trackIndex: number, callback: (step: number) => void) => void;
+    unregisterStepCallback: (trackIndex: number) => void;
 }
 
 export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
@@ -17,6 +19,7 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
     const sequenceRef = useRef<Tone.Sequence | null>(null);
     const isInitializedRef = useRef(false);
     const isStoppedRef = useRef(false);
+    const stepCallbacksRef = useRef<Map<number, (step: number) => void>>(new Map());
 
     // Initialize Tone.js transport
     useEffect(() => {
@@ -41,6 +44,15 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
         Tone.Transport.bpm.value = bpm;
     }, [bpm]);
 
+    // Register/unregister track callbacks
+    const registerStepCallback = useCallback((trackIndex: number, callback: (step: number) => void) => {
+        stepCallbacksRef.current.set(trackIndex, callback);
+    }, []);
+
+    const unregisterStepCallback = useCallback((trackIndex: number) => {
+        stepCallbacksRef.current.delete(trackIndex);
+    }, []);
+
     // Create the sequence
     useEffect(() => {
         // Dispose of existing sequence
@@ -51,11 +63,16 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
         // Create new sequence for 16 steps (16th notes)
         sequenceRef.current = new Tone.Sequence(
             (time, step) => {
-                // Schedule the step update to happen at the right time
+                // Schedule the step update and callback execution to happen at the right time
                 Tone.Draw.schedule(() => {
                     // Only update step if we're not stopped
                     if (!isStoppedRef.current) {
                         setCurrentStep(step);
+                        
+                        // Trigger all registered track callbacks at the precise time
+                        stepCallbacksRef.current.forEach((callback) => {
+                            callback(step);
+                        });
                     }
                 }, time);
             },
@@ -68,7 +85,7 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
                 sequenceRef.current.dispose();
             }
         };
-    }, []);
+    }, [setCurrentStep]);
 
     const start = useCallback(async () => {
         try {
@@ -111,6 +128,8 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
     return {
         isPlaying,
         start,
-        stop
+        stop,
+        registerStepCallback,
+        unregisterStepCallback
     };
 };

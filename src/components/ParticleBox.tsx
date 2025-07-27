@@ -6,7 +6,7 @@ import { ParticleScene } from './ParticleScene';
 import { ParticleParams, ParticleBoxProps } from './types';
 import { useCollisionPlayback } from '@/hooks/useCollisionPlayback';
 
-const SPEED_RANGE: [number, number] = [0.2, 4];
+const SPEED_RANGE: [number, number] = [0, 4];
 const SIZE_RANGE: [number, number] = [2, 10];
 const DEFAULT_PARTICLE_COUNT = 3;
 

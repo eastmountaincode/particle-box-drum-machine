@@ -1,26 +1,32 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useCallback } from 'react';
 import { useAtomValue } from 'jotai';
-import { currentStepAtom, getSequencerStepsAtom, getQuantizationAtom, isPlayingAtom, getMuteAtom, getFreezeAtom } from '@/store/atoms';
+import { getSequencerStepsAtom, getQuantizationAtom, getMuteAtom, getFreezeAtom } from '@/store/atoms';
 import { useDrumSamples } from './useDrumSamples';
 
-export const useTrackSamplePlayback = (trackIndex: number) => {
-  const currentStep = useAtomValue(currentStepAtom);
-  const isPlaying = useAtomValue(isPlayingAtom);
+interface UseTrackSamplePlaybackReturn {
+  onStepTriggered: (step: number) => void;
+}
+
+export const useTrackSamplePlayback = (trackIndex: number): UseTrackSamplePlaybackReturn => {
   const sequencerSteps = useAtomValue(getSequencerStepsAtom(trackIndex));
   const quantizationEnabled = useAtomValue(getQuantizationAtom(trackIndex));
   const freezeEnabled = useAtomValue(getFreezeAtom(trackIndex));
   const muteEnabled = useAtomValue(getMuteAtom(trackIndex));
   const drumSamples = useDrumSamples(trackIndex);
 
-  // Play sample when we hit an active step during quantized playback
-  useEffect(() => {
+  // Return a callback that can be called by the audio engine at the precise timing
+  const onStepTriggered = useCallback((step: number) => {
     // When freeze is ON, play samples for active steps (pattern is locked)
     // When freeze is OFF, the quantization system handles sample playback directly
     // to ensure samples only play when there was an actual collision
-    if (isPlaying && quantizationEnabled && freezeEnabled && !muteEnabled && sequencerSteps[currentStep]) {
+    if (quantizationEnabled && freezeEnabled && !muteEnabled && sequencerSteps[step]) {
       drumSamples.playSample();
     }
-  }, [currentStep, isPlaying, quantizationEnabled, freezeEnabled, sequencerSteps, muteEnabled, drumSamples, trackIndex]);
+  }, [quantizationEnabled, freezeEnabled, sequencerSteps, muteEnabled, drumSamples]);
+
+  return {
+    onStepTriggered
+  };
 }; 
