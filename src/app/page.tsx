@@ -18,8 +18,25 @@ export default function Home() {
     const [currentStep] = useAtom(currentStepAtom);
     const [_, setGlobalIsPlaying] = useAtom(isPlayingAtom);
     const [visualMode] = useAtom(visualModeAtom);
+    const [screenWidth, setScreenWidth] = useState(0);
 
     const { isPlaying, start, stop, registerStepCallback, unregisterStepCallback } = useAudioEngine(bpm);
+
+    // Check screen width on mount and resize
+    useEffect(() => {
+        const checkScreenWidth = () => {
+            setScreenWidth(window.innerWidth);
+        };
+
+        // Initial check
+        checkScreenWidth();
+
+        // Add resize listener
+        window.addEventListener('resize', checkScreenWidth);
+
+        // Cleanup
+        return () => window.removeEventListener('resize', checkScreenWidth);
+    }, []);
 
     // Sync audio engine state with global atom
     useEffect(() => {
@@ -37,6 +54,20 @@ export default function Home() {
             await start();
         }
     };
+
+    // Show message for narrow screens
+    if (screenWidth < 1140 && screenWidth > 0) {
+        return (
+            <div className="w-full h-screen bg-black flex items-center justify-center border border-white border-opacity-50">
+                <div className="text-center p-8 border border-white border-opacity-50 bg-black">
+                    <h1 className="text-white text-2xl mb-4 font-mono">PARTICLE BOX DRUM MACHINE</h1>
+                    <p className="text-white text-lg mb-2">This application requires a wider screen</p>
+                    <p className="text-white text-sm opacity-75">Minimum width: 1140px</p>
+                    <p className="text-white text-sm opacity-75">Current width: {screenWidth}px</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="w-full h-screen bg-black p-4 pl-8 pr-8 pb-8 border border-white border-opacity-50">
