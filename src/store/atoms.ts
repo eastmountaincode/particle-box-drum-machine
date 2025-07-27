@@ -16,7 +16,7 @@ export const particleCount4Atom = atom(3);
 // Lighting state atoms for each track (1-4)
 export const lighting1Atom = atom(false);
 export const lighting2Atom = atom(true);
-export const lighting3Atom = atom(true);
+export const lighting3Atom = atom(false);
 export const lighting4Atom = atom(true);
 
 // Quantization state atoms for each track (1-4)

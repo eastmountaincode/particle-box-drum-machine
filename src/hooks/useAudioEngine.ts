@@ -21,12 +21,31 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
     const isStoppedRef = useRef(false);
     const stepCallbacksRef = useRef<Map<number, (step: number) => void>>(new Map());
 
-    // Initialize Tone.js transport
+    // Initialize Tone.js transport with crash prevention
     useEffect(() => {
         if (!isInitializedRef.current) {
             // Set up the transport
             Tone.Transport.bpm.value = bpm;
             isInitializedRef.current = true;
+
+            // Handle page visibility to prevent audio context issues
+            const handleVisibilityChange = () => {
+                if (document.hidden) {
+                    // Don't stop audio, but log for debugging
+                    console.log('Page hidden - audio continues');
+                } else {
+                    // Resume audio context if needed
+                    if (Tone.context.state === 'suspended' && isPlaying) {
+                        Tone.start().catch(console.error);
+                    }
+                }
+            };
+
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+
+            return () => {
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+            };
         }
 
         return () => {

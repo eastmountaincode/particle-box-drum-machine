@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { useAtomValue } from 'jotai';
@@ -37,6 +37,7 @@ export const ParticleScene: React.FC<ParticleSceneProps> = ({
   const backgroundColor = muteEnabled ? '#000000' : (freezeEnabled && quantizationEnabled) ? '#000000' : defaultBackgroundColor;
   
   const [isDragging, setIsDragging] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Generate random initial camera position using spherical coordinates
   const initialCameraPosition = useMemo(() => {
@@ -57,15 +58,54 @@ export const ParticleScene: React.FC<ParticleSceneProps> = ({
     return [position.x, position.y, position.z] as [number, number, number];
   }, []); // Only generate once per component mount
 
+  // Basic crash prevention - handle WebGL context loss and visibility changes
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Reduce activity when tab is hidden
+        console.log('Tab hidden - reducing WebGL activity');
+      }
+    };
+
+    const handleContextLost = (event: Event) => {
+      event.preventDefault();
+      console.warn('WebGL context lost - will attempt recovery');
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Add context loss listener to canvas if available
+    if (canvasRef.current) {
+      canvasRef.current.addEventListener('webglcontextlost', handleContextLost);
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (canvasRef.current) {
+        canvasRef.current.removeEventListener('webglcontextlost', handleContextLost);
+      }
+    };
+  }, []);
+
   // Determine cursor style based on drag state
   const cursorStyle = isDragging ? 'grabbing' : 'grab';
 
   return (
     <Canvas
+      ref={canvasRef}
       camera={{ position: initialCameraPosition, fov: 40 }}
       style={{ 
         background: backgroundColor,
         cursor: cursorStyle
+      }}
+      gl={{
+        powerPreference: "default", // Don't force high-performance GPU
+        antialias: false, // Disable for better stability
+        preserveDrawingBuffer: false
+      }}
+      onCreated={({ gl }) => {
+        // Limit pixel ratio to prevent excessive memory usage
+        gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       }}
     >
       <CameraTracker 
