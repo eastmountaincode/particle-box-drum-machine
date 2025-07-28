@@ -4,6 +4,8 @@ import React from 'react';
 import { useAtom } from 'jotai';
 import { getSampleIndexAtom, getQuantizationAtom, getFreezeAtom, getMuteAtom, getTrackVolumeAtom } from '@/store/atoms';
 import { getInstrumentForTrack, getSampleName, getSampleCount } from '@/utils/samples';
+import { InlineTooltip } from './Tutorial/InlineTooltip';
+import { useTutorial } from './Tutorial/TutorialContext';
 
 interface ControlPanelProps {
   trackNumber?: number;
@@ -31,6 +33,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   const instrument = getInstrumentForTrack(trackNumber - 1);
   const currentSample = getSampleName(instrument, sampleIndex);
   const sampleCount = getSampleCount(instrument);
+
+  // Tutorial state
+  const { isTutorialActive } = useTutorial();
 
   const handleParticleDecrease = () => {
     if (onParticleCountChange && particleCount > MIN_PARTICLE_COUNT) {
@@ -65,35 +70,34 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   };
 
   return (
-    <div className="w-full h-full bg-black border border-white border-opacity-50 p-2 flex gap-2 select-none">
+    <div className="w-full h-full bg-black border border-white border-opacity-50 p-2 flex gap-2 select-none relative">
       {/* Main controls column */}
       <div className="flex-1 flex flex-col gap-2">
         {/* Mute button */}
-        <button 
+        <button
           onClick={handleMuteToggle}
-          className={`flex-1 text-xs px-2 border border-white border-opacity-50 cursor-pointer ${
-            muteEnabled 
-              ? 'bg-white text-black' 
-              : 'bg-black text-white hover:bg-white hover:text-black'
-          }`}
+          className={`flex-1 text-xs px-2 border border-white border-opacity-50 cursor-pointer ${muteEnabled
+            ? 'bg-white text-black'
+            : 'bg-black text-white hover:bg-white hover:text-black'
+            }`}
         >
           MUTE {muteEnabled ? 'ON' : 'OFF'}
         </button>
 
         {/* Freeze pattern button */}
-        <button 
+        <button
           onClick={handleFreezeToggle}
-          className={`flex-1 text-xs px-2 border border-white border-opacity-50 cursor-pointer ${
-            freezeEnabled 
-              ? 'bg-white text-black' 
-              : 'bg-black text-white hover:bg-white hover:text-black'
-          }`}
+          className={`flex-1 text-xs px-2 border border-white border-opacity-50 cursor-pointer ${freezeEnabled
+            ? 'bg-white text-black'
+            : 'bg-black text-white hover:bg-white hover:text-black'
+            }`}
+          data-tutorial={`freeze-button-${trackNumber - 1}`}
         >
           FREEZE {freezeEnabled ? 'ON' : 'OFF'}
         </button>
 
         {/* Particle count control row */}
-        <div className="flex-1 flex items-center border border-white border-opacity-50">
+        <div className="flex-1 flex items-center border border-white border-opacity-50" data-tutorial={`particle-count-${trackNumber - 1}`}>
           <button
             onClick={handleParticleDecrease}
             className="flex-1 h-full bg-black hover:bg-white hover:text-black text-white text-xs border-r border-white border-opacity-50 cursor-pointer"
@@ -114,7 +118,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
 
         {/* Sample selection control */}
-        <div className="flex-1 flex flex-col border border-white border-opacity-50">
+        <div className="flex-1 flex flex-col border border-white border-opacity-50" data-tutorial={`sample-selector-${trackNumber - 1}`}>
           <div className="flex-1 flex items-center">
             <button
               onClick={handleSamplePrevious}
@@ -138,21 +142,21 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         <div className="flex-1 flex items-center border border-white">
           <button
             onClick={handleQuantizationToggle}
-            className={`flex-1 h-full text-xs border-r border-white cursor-pointer min-w-0 ${
-              quantizationEnabled 
-                ? 'bg-white text-black' 
-                : 'bg-black text-white hover:bg-white hover:text-black'
-            }`}
+            className={`flex-1 h-full text-xs border-r border-white cursor-pointer min-w-0 ${quantizationEnabled
+              ? 'bg-white text-black'
+              : 'bg-black text-white hover:bg-white hover:text-black'
+              }`}
+            data-tutorial={`quantization-${trackNumber - 1}`}
           >
             Q {quantizationEnabled ? 'ON' : 'OFF'}
           </button>
           <button
             onClick={onLightingToggle}
-            className={`flex-1 h-full text-xs cursor-pointer min-w-0 ${
-              useLighting 
-                ? 'bg-white text-black' 
-                : 'bg-black text-white hover:bg-white hover:text-black'
-            }`}
+            className={`flex-1 h-full text-xs cursor-pointer min-w-0 ${useLighting
+              ? 'bg-white text-black'
+              : 'bg-black text-white hover:bg-white hover:text-black'
+              }`}
+            data-tutorial={`lighting-${trackNumber - 1}`}
           >
             LIGHT {useLighting ? 'ON' : 'OFF'}
           </button>
@@ -175,6 +179,21 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
         <span className="text-white text-xs">VOL</span>
       </div>
+
+      {/* Only show tooltip for track 2 (trackNumber === 2) */}
+      {trackNumber === 2 && (
+        <InlineTooltip
+          title="Track Controls"
+          content={`• MUTE track.
+• FREEZE locks in the pattern based on the previous 16 steps. When FREEZE is OFF, the sequencer gets its input exclusively from the Particle Box. When FREEZE is ON, the sequencer gets its input exclusively from the sequence pads.
+• Use + and − buttons to control number of particles.
+• Adjust the sample with the arrow keys
+• Q turns quantization on and off (when the particle hits the wall, it will be quantized to the nearest 16th note).
+• LIGHT turns reverb on and off.`}
+          position="right"
+          isVisible={isTutorialActive}
+        />
+      )}
     </div>
   );
 };

@@ -2,8 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSetAtom, useAtom } from 'jotai';
-import { IoRefresh } from 'react-icons/io5';
+import { IoRefresh, IoDesktopOutline } from 'react-icons/io5';
 import { getFreezeAtom, reverbWetAtom, reverbDecayAtom, reverbRoomSizeAtom, globalVolumeAtom, visualModeAtom } from '@/store/atoms';
+import { TutorialButton } from './Tutorial/TutorialButton';
+import { InlineTooltip } from './Tutorial/InlineTooltip';
+import { useTutorial } from './Tutorial/TutorialContext';
 
 const MIN_BPM = 1;
 const MAX_BPM = 300;
@@ -38,7 +41,7 @@ export const GlobalControls: React.FC<GlobalControlsProps> = ({
     const [reverbWet, setReverbWet] = useAtom(reverbWetAtom);
     const [reverbDecay, setReverbDecay] = useAtom(reverbDecayAtom);
     const [reverbRoomSize, setReverbRoomSize] = useAtom(reverbRoomSizeAtom);
-    
+
     // Local state for smooth slider interaction
     const [localReverbWet, setLocalReverbWet] = useState(reverbWet);
     const [localReverbDecay, setLocalReverbDecay] = useState(reverbDecay);
@@ -46,6 +49,9 @@ export const GlobalControls: React.FC<GlobalControlsProps> = ({
 
     // Global volume
     const [globalVolume, setGlobalVolume] = useAtom(globalVolumeAtom);
+
+    // Tutorial state
+    const { isTutorialActive, setTutorialActive } = useTutorial();
 
     useEffect(() => {
         setInputValue(bpm.toString());
@@ -76,15 +82,28 @@ export const GlobalControls: React.FC<GlobalControlsProps> = ({
         window.location.reload();
     };
 
+    const handleTutorialToggle = () => {
+        setTutorialActive(!isTutorialActive);
+    };
+
+    // Close tutorial when switching to visual mode
+    useEffect(() => {
+        if (visualMode && isTutorialActive) {
+            setTutorialActive(false);
+        }
+    }, [visualMode, isTutorialActive, setTutorialActive]);
+
     return (
         <div className="flex items-center gap-4 bg-black border border-white border-opacity-50 p-2 pl-3 pr-3 select-none">
-            {/* Play/Stop Button - Always visible */}
-            <button
-                onClick={onPlayStop}
-                className="bg-black hover:bg-white hover:text-black text-white text-xs py-2 border border-white border-opacity-50 cursor-pointer w-16 text-center"
-            >
-                {isPlaying ? 'STOP' : 'PLAY'}
-            </button>
+            {/* Play/Stop Button - Only show in tech mode */}
+            {!visualMode && (
+                <button
+                    onClick={onPlayStop}
+                    className="bg-black hover:bg-white hover:text-black text-white text-xs py-2 border border-white border-opacity-50 cursor-pointer w-16 text-center"
+                >
+                    {isPlaying ? 'STOP' : 'PLAY'}
+                </button>
+            )}
 
             {/* All other controls - only show when NOT in visual mode */}
             {!visualMode && (
@@ -164,18 +183,26 @@ export const GlobalControls: React.FC<GlobalControlsProps> = ({
                         </div>
                     </div>
 
-                    {/* Freeze All Button */}
-                    <button
-                        onClick={handleFreezeAll}
-                        className="bg-black hover:bg-white hover:text-black text-white text-xs py-2 px-3 border border-white border-opacity-50 cursor-pointer"
-                    >
-                        FREEZE ALL
-                    </button>
+                    {/* Freeze All Button with inline tooltip */}
+                    <div className="relative">
+                        <button
+                            onClick={handleFreezeAll}
+                            className="bg-black hover:bg-white hover:text-black text-white text-xs py-2 px-3 border border-white border-opacity-50 cursor-pointer"
+                        >
+                            FREEZE ALL
+                        </button>
+                        <InlineTooltip
+                            title="Freeze All"
+                            content="Freeze the patterns of all 4 tracks - basically, lock in the previous 16 hits for all tracks."
+                            position="bottom"
+                            isVisible={isTutorialActive}
+                        />
+                    </div>
 
                     {/* Reverb Controls */}
                     <div className="flex items-center gap-2">
                         <span className="text-white text-xs">REVERB:</span>
-                        
+
                         {/* Wet/Dry Control */}
                         <div className="flex flex-col items-center">
                             <span className="text-white text-xs mb-1">WET</span>
@@ -228,28 +255,42 @@ export const GlobalControls: React.FC<GlobalControlsProps> = ({
                         </div>
                     </div>
 
-                    {/* Refresh Button */}
-                    <button
-                        onClick={handleRefresh}
-                        className="bg-black hover:bg-white hover:text-black text-white py-2 px-2 border border-white border-opacity-50 cursor-pointer"
-                        title="Refresh Page"
-                    >
-                        <IoRefresh size={16} />
-                    </button>
+                    {/* Refresh Button with inline tooltip */}
+                    <div className="relative">
+                        <button
+                            onClick={handleRefresh}
+                            className="bg-black hover:bg-white hover:text-black text-white py-2 px-2 border border-white border-opacity-50 cursor-pointer"
+                            title="Refresh Page"
+                        >
+                            <IoRefresh size={16} />
+                        </button>
+                        <InlineTooltip
+                            title="Refresh"
+                            content="Reload the page to reset everything and generate new random starting configurations."
+                            position="bottom"
+                            isVisible={isTutorialActive}
+                        />
+                    </div>
                 </>
             )}
 
             {/* Visual Mode Toggle - Always visible, far right */}
             <button
                 onClick={() => setVisualMode(!visualMode)}
-                className={`text-xs py-2 px-3 border border-white border-opacity-50 cursor-pointer ${
-                    visualMode 
-                        ? 'bg-black text-white hover:bg-white hover:text-black' 
-                        : 'bg-black text-white hover:bg-white hover:text-black'
-                }`}
+                className={`bg-black hover:bg-white hover:text-black text-white text-xs py-2 px-3 border border-black hover:border-white cursor-pointer ${visualMode ? 'border-black' : 'border-white'}`}
+                title={visualMode ? "Switch to Tech Mode" : "Switch to Visual Mode"}
             >
-                {visualMode ? 'VISUAL MODE' : 'TECH MODE'}
+                {visualMode ? (
+                    <IoDesktopOutline size={16} />
+                ) : (
+                    'TECH MODE'
+                )}
             </button>
+
+            {/* Tutorial Button - Only show in tech mode */}
+            {!visualMode && (
+                <TutorialButton onClick={handleTutorialToggle} isActive={isTutorialActive} />
+            )}
         </div>
     );
 }; 

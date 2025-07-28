@@ -5,13 +5,15 @@ import * as THREE from 'three';
 import { ParticleScene } from './ParticleScene';
 import { ParticleParams, ParticleBoxProps } from './types';
 import { useCollisionPlayback } from '@/hooks/useCollisionPlayback';
+import { InlineTooltip } from './Tutorial/InlineTooltip';
+import { useTutorial } from './Tutorial/TutorialContext';
 
 const SPEED_RANGE: [number, number] = [0, 4];
 const SIZE_RANGE: [number, number] = [2, 10];
 const DEFAULT_PARTICLE_COUNT = 3;
 
-export const ParticleBox: React.FC<ParticleBoxProps> = ({ 
-  useLighting = false, 
+export const ParticleBox: React.FC<ParticleBoxProps> = ({
+  useLighting = false,
   particleCount: externalParticleCount,
   onWallHit: onQuantizationHit,
   trackIndex = 0
@@ -22,9 +24,12 @@ export const ParticleBox: React.FC<ParticleBoxProps> = ({
   });
   const [flashingWalls, setFlashingWalls] = useState<Set<string>>(new Set());
   const [internalParticleCount, _] = useState<number>(DEFAULT_PARTICLE_COUNT);
-  
+
   // Use collision playback hook for immediate audio
   const { onCollisionHit } = useCollisionPlayback(trackIndex);
+
+  // Tutorial state
+  const { isTutorialActive } = useTutorial();
 
   // Store timeout references to prevent memory leaks
   const timeoutRefsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -60,7 +65,7 @@ export const ParticleBox: React.FC<ParticleBoxProps> = ({
       // Clean up the timeout reference
       timeoutRefsRef.current.delete(wall);
     }, 150);
-    
+
     // Store the timeout reference
     timeoutRefsRef.current.set(wall, timeout);
 
@@ -68,13 +73,13 @@ export const ParticleBox: React.FC<ParticleBoxProps> = ({
     if (onQuantizationHit) {
       onQuantizationHit();
     }
-    
+
     // Call collision playback (for immediate audio when quantization is off)
     onCollisionHit();
   }, [onQuantizationHit, onCollisionHit]);
 
   return (
-    <div className="w-full h-full bg-black">
+    <div className="w-full h-full bg-black relative">
       {/* <ParticleStats 
         speed={particleParams.speed}
         size={particleParams.size}
@@ -91,6 +96,16 @@ export const ParticleBox: React.FC<ParticleBoxProps> = ({
         sizeRange={SIZE_RANGE}
         trackIndex={trackIndex}
       />
+
+      {/* Only show tooltip for track 1 (index 0) */}
+      {trackIndex === 0 && (
+        <InlineTooltip
+          title="Particle Box"
+          content="Drag to rotate the box and change particle speed and size."
+          position="top"
+          isVisible={isTutorialActive}
+        />
+      )}
     </div>
   );
 }; 

@@ -4,6 +4,9 @@ import { ParticleBox } from '@/components/ParticleBox';
 import { ControlPanel } from '@/components/ControlPanel';
 import { GlobalControls } from '@/components/GlobalControls';
 import { SequencerDisplay } from '@/components/SequencerDisplay';
+import { TutorialProvider } from '@/components/Tutorial/TutorialContext';
+import { CreditsTooltip } from '@/components/Tutorial/CreditsTooltip';
+import { useTutorial } from '@/components/Tutorial/TutorialContext';
 import { useAtom } from 'jotai';
 import { getParticleCountAtom, getLightingAtom, currentStepAtom, isPlayingAtom, getSequencerStepsAtom, visualModeAtom } from '@/store/atoms';
 import { useState, useEffect } from 'react';
@@ -70,38 +73,71 @@ export default function Home() {
     }
 
     return (
-        <div className="w-full h-screen bg-black p-4 pl-8 pr-8 pb-8 border border-white border-opacity-50">
-            <div className="w-full h-full flex flex-col gap-3">
-                {/* Global Drum Sequencer Controls */}
-                <div className="flex justify-center">
-                    <GlobalControls
-                        isPlaying={isPlaying}
-                        currentStep={currentStep}
-                        bpm={bpm}
-                        onPlayStop={handlePlayStop}
-                        onBpmChange={setBpm}
-                    />
-                </div>
-
-                {/* Track Rows */}
-                <div className={visualMode ? "flex flex-col gap-4" : "flex-1 flex flex-col gap-4"}>
-                    {[1, 2, 3, 4].map((row, index) => (
-                        <TrackRow 
-                            key={row} 
-                            index={index} 
-                            trackNumber={row} 
-                            currentStep={currentStep} 
-                            bpm={bpm}
-                            registerStepCallback={registerStepCallback}
-                            unregisterStepCallback={unregisterStepCallback}
-                            visualMode={visualMode}
-                        />
-                    ))}
-                </div>
-            </div>
-        </div>
+        <TutorialProvider>
+            <MainContent 
+                isPlaying={isPlaying}
+                currentStep={currentStep}
+                bpm={bpm}
+                onPlayStop={handlePlayStop}
+                onBpmChange={setBpm}
+                registerStepCallback={registerStepCallback}
+                unregisterStepCallback={unregisterStepCallback}
+                visualMode={visualMode}
+            />
+        </TutorialProvider>
     );
 }
+
+const MainContent: React.FC<{
+    isPlaying: boolean;
+    currentStep: number;
+    bpm: number;
+    onPlayStop: () => void;
+    onBpmChange: (bpm: number) => void;
+    registerStepCallback: (trackIndex: number, callback: (step: number) => void) => void;
+    unregisterStepCallback: (trackIndex: number) => void;
+    visualMode: boolean;
+}> = ({ isPlaying, currentStep, bpm, onPlayStop, onBpmChange, registerStepCallback, unregisterStepCallback, visualMode }) => {
+    const { isTutorialActive } = useTutorial();
+
+    return (
+        <>
+            <div className="w-full h-screen bg-black p-4 pl-8 pr-8 pb-8 border border-white border-opacity-50">
+                <div className="w-full h-full flex flex-col gap-3">
+                    {/* Global Drum Sequencer Controls */}
+                    <div className="flex justify-center">
+                        <GlobalControls
+                            isPlaying={isPlaying}
+                            currentStep={currentStep}
+                            bpm={bpm}
+                            onPlayStop={onPlayStop}
+                            onBpmChange={onBpmChange}
+                        />
+                    </div>
+
+                    {/* Track Rows */}
+                    <div className={visualMode ? "flex flex-col gap-4" : "flex-1 flex flex-col gap-4"}>
+                        {[1, 2, 3, 4].map((row, index) => (
+                            <TrackRow 
+                                key={row} 
+                                index={index} 
+                                trackNumber={row} 
+                                currentStep={currentStep} 
+                                bpm={bpm}
+                                registerStepCallback={registerStepCallback}
+                                unregisterStepCallback={unregisterStepCallback}
+                                visualMode={visualMode}
+                            />
+                        ))}
+                    </div>
+                </div>
+            </div>
+            
+            {/* Credits Tooltip */}
+            <CreditsTooltip isVisible={isTutorialActive} />
+        </>
+    );
+};
 
 const TrackRow: React.FC<{ 
     index: number; 
