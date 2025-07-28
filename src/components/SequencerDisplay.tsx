@@ -85,7 +85,7 @@ export const SequencerDisplay: React.FC<SequencerDisplayProps> = ({
                   onClick={() => onStepToggle(index)}
                   title={`Step ${index + 1}${isQuarterNote ? ' (Quarter Note)' : ''} - ${isCurrent ? 'Current' : ''}${isActive ? ' Active' : ''}`}
                 >
-                  <div className="w-full h-full flex items-center justify-center text-lg">
+                  <div className="w-full h-full flex items-center justify-center text-lg select-none">
                     {isActive ? '●' : ''}
                   </div>
                 </div>

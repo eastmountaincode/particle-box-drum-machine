@@ -49,7 +49,7 @@ export const reverbDecayAtom = atom(1.5);
 export const reverbRoomSizeAtom = atom(0.3);
 
 // Global volume parameter
-export const globalVolumeAtom = atom(0.5);
+export const globalVolumeAtom = atom(0.2);
 
 // Per-track volume atoms (1-4)
 export const trackVolume1Atom = atom(0.8);
