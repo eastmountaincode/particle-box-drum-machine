@@ -180,8 +180,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         <span className="text-white text-xs">VOL</span>
       </div>
 
-      {/* Only show tooltip for track 2 (trackNumber === 2) */}
-      {trackNumber === 2 && (
+      {/* Only show tooltip for track 3 (trackNumber === 3) */}
+      {trackNumber === 3 && (
         <InlineTooltip
           title="Track Controls"
           content={`• MUTE track.
@@ -191,6 +191,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 • Q turns quantization on and off (when the particle hits the wall, it will be quantized to the nearest 16th note).
 • LIGHT turns reverb on and off.`}
           position="right"
+          offsetX={-100}
           isVisible={isTutorialActive}
         />
       )}

@@ -103,6 +103,7 @@ export const ParticleBox: React.FC<ParticleBoxProps> = ({
           title="Particle Box"
           content="Drag to rotate the box and change particle speed and size."
           position="top"
+          offsetX={-20}
           isVisible={isTutorialActive}
         />
       )}

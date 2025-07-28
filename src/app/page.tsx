@@ -15,6 +15,7 @@ import { useRandomizeSamples } from '@/hooks/useRandomizeSamples';
 import { useRandomizeParticleCounts } from '@/hooks/useRandomizeParticleCounts';
 import { useQuantization } from '@/hooks/useQuantization';
 import { useTrackSamplePlayback } from '@/hooks/useTrackSamplePlayback';
+import { useSamplePreloader, disposeSamplePreloader } from '@/hooks/useSamplePreloader';
 
 export default function Home() {
     const [bpm, setBpm] = useState(120);
@@ -46,9 +47,19 @@ export default function Home() {
         setGlobalIsPlaying(isPlaying);
     }, [isPlaying, setGlobalIsPlaying]);
 
+    // Initialize sample preloader early in the application lifecycle
+    useSamplePreloader();
+
     // Randomize samples and particle counts on client-side mount
     useRandomizeSamples();
     useRandomizeParticleCounts();
+
+    // Cleanup sample preloader on app unmount
+    useEffect(() => {
+        return () => {
+            disposeSamplePreloader();
+        };
+    }, []);
 
     const handlePlayStop = async () => {
         if (isPlaying) {

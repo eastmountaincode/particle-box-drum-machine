@@ -51,3 +51,80 @@ export const getSampleName = (instrument: InstrumentType, sampleIndex: number): 
 export const getSampleCount = (instrument: InstrumentType): number => {
   return SAMPLE_DATA[instrument].length;
 };
+
+// Sample Manager Utility Functions
+
+/**
+ * Generate a unique sample key for caching and identification
+ * Format: "instrument:sampleIndex"
+ */
+export const getSampleKey = (instrument: InstrumentType, sampleIndex: number): string => {
+  return `${instrument}:${sampleIndex}`;
+};
+
+/**
+ * Get all sample paths for all instruments
+ * Returns an array of full paths to all samples
+ */
+export const getAllSamplePaths = (): string[] => {
+  const allPaths: string[] = [];
+  
+  INSTRUMENT_TYPES.forEach(instrument => {
+    SAMPLE_DATA[instrument].forEach(sampleName => {
+      allPaths.push(getSamplePath(instrument, sampleName));
+    });
+  });
+  
+  return allPaths;
+};
+
+/**
+ * Calculate total sample count across all instruments
+ */
+export const getTotalSampleCount = (): number => {
+  return INSTRUMENT_TYPES.reduce((total, instrument) => {
+    return total + SAMPLE_DATA[instrument].length;
+  }, 0);
+};
+
+/**
+ * Get all sample metadata for a specific instrument
+ * Returns array of objects with sample information
+ */
+export const getInstrumentSamples = (instrument: InstrumentType): Array<{
+  index: number;
+  name: string;
+  path: string;
+  key: string;
+}> => {
+  return SAMPLE_DATA[instrument].map((sampleName, index) => ({
+    index,
+    name: sampleName,
+    path: getSamplePath(instrument, sampleName),
+    key: getSampleKey(instrument, index)
+  }));
+};
+
+/**
+ * Get all samples metadata for all instruments
+ * Returns a map of instrument to sample metadata arrays
+ */
+export const getAllSamplesMetadata = (): Record<InstrumentType, Array<{
+  index: number;
+  name: string;
+  path: string;
+  key: string;
+}>> => {
+  const metadata = {} as Record<InstrumentType, Array<{
+    index: number;
+    name: string;
+    path: string;
+    key: string;
+  }>>;
+  
+  INSTRUMENT_TYPES.forEach(instrument => {
+    metadata[instrument] = getInstrumentSamples(instrument);
+  });
+  
+  return metadata;
+};

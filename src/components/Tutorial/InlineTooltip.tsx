@@ -7,13 +7,19 @@ interface InlineTooltipProps {
   content: string;
   position: 'top' | 'bottom' | 'left' | 'right';
   isVisible: boolean;
+  offsetX?: number;
+  offsetY?: number;
+  width?: string;
 }
 
 export const InlineTooltip: React.FC<InlineTooltipProps> = ({
   title,
   content,
   position,
-  isVisible
+  isVisible,
+  offsetX = 0,
+  offsetY = 0,
+  width = 'w-64'
 }) => {
   if (!isVisible) return null;
 
@@ -159,14 +165,19 @@ export const InlineTooltip: React.FC<InlineTooltipProps> = ({
   };
 
   return (
-    <div className={`absolute z-50 ${getPositionClasses()}`}>
+    <div 
+      className={`absolute z-50 ${getPositionClasses()}`}
+      style={{
+        transform: `translate(${offsetX}px, ${offsetY}px)`
+      }}
+    >
       {/* Arrow with outline effect - white outline triangle */}
       <div style={getArrowStyle()} />
       {/* Arrow fill - black triangle positioned on top */}
       <div style={getArrowFillStyle()} />
 
       {/* Tooltip content */}
-      <div className="bg-black border border-white border-opacity-50 shadow-2xl p-3 w-64">
+      <div className={`bg-black border border-white border-opacity-50 shadow-2xl p-3 ${width}`}>
         <h3 className="font-bold text-sm text-white mb-2">{title}</h3>
         <div className="text-xs leading-relaxed text-white">
           {content.split('\n').map((line, index) => (

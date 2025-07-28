@@ -195,6 +195,7 @@ export const GlobalControls: React.FC<GlobalControlsProps> = ({
                             title="Freeze All"
                             content="Freeze the patterns of all 4 tracks - basically, lock in the previous 16 hits for all tracks."
                             position="bottom"
+                            width="w-80"
                             isVisible={isTutorialActive}
                         />
                     </div>

@@ -98,6 +98,7 @@ export const SequencerDisplay: React.FC<SequencerDisplayProps> = ({
 • Dots show active steps.
 • Remember, if FREEZE is off, all input to the sequencer is coming from Particle Box collisions. Any manual activation will be overwritten by input from Particle Box if FREEZE is on.`}
                     position="right"
+                    offsetX={-75}
                     isVisible={isTutorialActive}
                   />
                 )}
