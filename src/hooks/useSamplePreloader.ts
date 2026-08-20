@@ -1,283 +1,331 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import * as Tone from 'tone';
-import { 
-  InstrumentType, 
-  INSTRUMENT_TYPES, 
-  SAMPLE_DATA, 
-  getSamplePath, 
-  getSampleKey, 
-  getTotalSampleCount 
+import {
+  DRUM_KITS,
+  getAllKitSampleRefs,
+  getSample,
+  getSampleKey,
+  type DrumKitId,
+  type InstrumentType,
 } from '@/utils/samples';
 
-// Sample cache entry interface
-interface SampleCacheEntry {
-  player: Tone.Player;
-  loaded: boolean;
-  error?: Error;
-}
+export type KitLoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 
-// Sample cache type
-type SampleCache = Map<string, SampleCacheEntry>;
-
-// Loading state interface
-interface LoadingState {
+export interface KitLoadingState {
+  status: KitLoadStatus;
   totalSamples: number;
   loadedSamples: number;
   failedSamples: number;
   progress: number;
+  error: string | null;
 }
 
-// Hook return interface
 interface UseSamplePreloaderReturn {
-  getPlayer: (instrument: InstrumentType, sampleIndex: number) => Tone.Player | null;
-  isLoaded: (instrument: InstrumentType, sampleIndex: number) => boolean;
-  loadingProgress: number;
-  allSamplesLoaded: boolean;
-  loadingState: LoadingState;
+  preloadKit: (kitId: DrumKitId) => Promise<void>;
+  getBuffer: (
+    kitId: DrumKitId,
+    instrument: InstrumentType,
+    sampleIndex: number
+  ) => Tone.ToneAudioBuffer | null;
+  isLoaded: (
+    kitId: DrumKitId,
+    instrument: InstrumentType,
+    sampleIndex: number
+  ) => boolean;
+  getKitLoadingState: (kitId: DrumKitId) => KitLoadingState;
+  cacheVersion: number;
 }
 
-// Singleton state to ensure only one instance across the app
-let globalSampleCache: SampleCache | null = null;
-let globalLoadingState: LoadingState = {
+interface SampleWatch {
+  instrument: InstrumentType;
+  sampleIndex: number;
+}
+
+const EMPTY_KIT_STATE: KitLoadingState = {
+  status: 'idle',
   totalSamples: 0,
   loadedSamples: 0,
   failedSamples: 0,
-  progress: 0
+  progress: 0,
+  error: null,
 };
-let isInitialized = false;
-let initializationPromise: Promise<void> | null = null;
 
-/**
- * Global sample preloader hook with singleton pattern
- * Preloads all drum samples at initialization and provides access to preloaded Player instances
- */
-export const useSamplePreloader = (): UseSamplePreloaderReturn => {
-  const [loadingState, setLoadingState] = useState<LoadingState>(globalLoadingState);
-  const mountedRef = useRef(true);
+const sampleBufferCache = new Map<string, Tone.ToneAudioBuffer>();
+const sampleLoadingPromises = new Map<string, Promise<Tone.ToneAudioBuffer | null>>();
+const kitLoadingStates = new Map<DrumKitId, KitLoadingState>();
+const kitLoadingPromises = new Map<DrumKitId, Promise<void>>();
+const listeners = new Set<() => void>();
+const sampleListeners = new Map<string, Set<() => void>>();
+const sampleVersions = new Map<string, number>();
 
-  // Update loading state helper
-  const updateLoadingState = useCallback((newState: Partial<LoadingState>) => {
-    globalLoadingState = {
-      ...globalLoadingState,
-      ...newState,
-      progress: globalLoadingState.totalSamples > 0 
-        ? (globalLoadingState.loadedSamples + globalLoadingState.failedSamples) / globalLoadingState.totalSamples 
-        : 0
-    };
-    
-    if (mountedRef.current) {
-      setLoadingState({ ...globalLoadingState });
+let storeVersion = 0;
+let cacheGeneration = 0;
+
+const KIT_PRELOAD_CONCURRENCY = 4;
+
+const notify = () => {
+  storeVersion += 1;
+  listeners.forEach((listener) => listener());
+};
+
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
+
+const getSnapshot = () => storeVersion;
+const getServerSnapshot = () => 0;
+
+const notifySample = (sampleKey: string) => {
+  sampleVersions.set(sampleKey, (sampleVersions.get(sampleKey) ?? 0) + 1);
+  sampleListeners.get(sampleKey)?.forEach((listener) => listener());
+};
+
+const setKitLoadingState = (kitId: DrumKitId, state: KitLoadingState) => {
+  kitLoadingStates.set(kitId, state);
+  notify();
+};
+
+export const getKitLoadingState = (kitId: DrumKitId): KitLoadingState => (
+  kitLoadingStates.get(kitId) ?? EMPTY_KIT_STATE
+);
+
+export const getPreloadedSampleBuffer = (
+  kitId: DrumKitId,
+  instrument: InstrumentType,
+  sampleIndex: number
+): Tone.ToneAudioBuffer | null => (
+  sampleBufferCache.get(getSampleKey(kitId, instrument, sampleIndex)) ?? null
+);
+
+export const isSampleBufferLoaded = (
+  kitId: DrumKitId,
+  instrument: InstrumentType,
+  sampleIndex: number
+): boolean => sampleBufferCache.has(getSampleKey(kitId, instrument, sampleIndex));
+
+const loadSampleBuffer = (
+  kitId: DrumKitId,
+  instrument: InstrumentType,
+  sampleIndex: number,
+  path: string
+): Promise<Tone.ToneAudioBuffer | null> => {
+  const sampleKey = getSampleKey(kitId, instrument, sampleIndex);
+  const cachedBuffer = sampleBufferCache.get(sampleKey);
+  if (cachedBuffer) return Promise.resolve(cachedBuffer);
+
+  const existingPromise = sampleLoadingPromises.get(sampleKey);
+  if (existingPromise) return existingPromise;
+
+  const generation = cacheGeneration;
+  const loadPromise = Tone.ToneAudioBuffer.fromUrl(path).then((buffer) => {
+    if (generation !== cacheGeneration) {
+      buffer.dispose();
+      return null;
     }
-  }, []);
 
-  // Initialize sample cache and preload all samples
-  const initializeSampleCache = useCallback(async (): Promise<void> => {
-    if (isInitialized || initializationPromise) {
-      return initializationPromise || Promise.resolve();
+    sampleBufferCache.set(sampleKey, buffer);
+    notifySample(sampleKey);
+    return buffer;
+  });
+
+  sampleLoadingPromises.set(sampleKey, loadPromise);
+  const clearPromise = () => {
+    if (sampleLoadingPromises.get(sampleKey) === loadPromise) {
+      sampleLoadingPromises.delete(sampleKey);
     }
+  };
+  void loadPromise.then(clearPromise, clearPromise);
+  return loadPromise;
+};
 
-    console.log('Initializing sample preloader...');
-    isInitialized = true;
-    globalSampleCache = new Map();
-    
-    const totalSamples = getTotalSampleCount();
-    updateLoadingState({
-      totalSamples,
-      loadedSamples: 0,
-      failedSamples: 0,
-      progress: 0
-    });
+export const preloadSampleBuffer = (
+  kitId: DrumKitId,
+  instrument: InstrumentType,
+  sampleIndex: number
+): Promise<Tone.ToneAudioBuffer | null> => {
+  const sample = getSample(kitId, instrument, sampleIndex);
+  return loadSampleBuffer(kitId, instrument, sample.index, sample.path);
+};
 
-    // Create promise for initialization
-    initializationPromise = new Promise<void>((resolve) => {
-      let completedSamples = 0;
-      
-      const checkCompletion = () => {
-        completedSamples++;
-        if (completedSamples >= totalSamples) {
-          console.log(`Sample preloader initialization complete. Loaded: ${globalLoadingState.loadedSamples}, Failed: ${globalLoadingState.failedSamples}`);
-          resolve();
+export const preloadKitSamples = (kitId: DrumKitId): Promise<void> => {
+  if (getKitLoadingState(kitId).status === 'ready') {
+    return Promise.resolve();
+  }
+
+  const existingPromise = kitLoadingPromises.get(kitId);
+  if (existingPromise) return existingPromise;
+
+  const generation = cacheGeneration;
+  const samples = getAllKitSampleRefs(kitId);
+  const samplesToLoad = samples.filter(({ instrument, index }) => (
+    !sampleBufferCache.has(getSampleKey(kitId, instrument, index))
+  ));
+  const alreadyLoaded = samples.length - samplesToLoad.length;
+
+  setKitLoadingState(kitId, {
+    status: 'loading',
+    totalSamples: samples.length,
+    loadedSamples: alreadyLoaded,
+    failedSamples: 0,
+    progress: samples.length === 0 ? 1 : alreadyLoaded / samples.length,
+    error: null,
+  });
+
+  const loadPromise = (async () => {
+    const results: PromiseSettledResult<void>[] = new Array(samplesToLoad.length);
+    let nextSampleIndex = 0;
+
+    const loadNextSample = async () => {
+      while (nextSampleIndex < samplesToLoad.length) {
+        const resultIndex = nextSampleIndex;
+        nextSampleIndex += 1;
+        const { instrument, index, sample } = samplesToLoad[resultIndex];
+
+        try {
+          await loadSampleBuffer(kitId, instrument, index, sample.path);
+          if (generation !== cacheGeneration) return;
+
+          const currentState = getKitLoadingState(kitId);
+          const loadedSamples = currentState.loadedSamples + 1;
+          setKitLoadingState(kitId, {
+            ...currentState,
+            loadedSamples,
+            progress: currentState.totalSamples === 0
+              ? 1
+              : (loadedSamples + currentState.failedSamples) / currentState.totalSamples,
+          });
+          results[resultIndex] = { status: 'fulfilled', value: undefined };
+        } catch (error) {
+          if (generation !== cacheGeneration) return;
+
+          const currentState = getKitLoadingState(kitId);
+          const failedSamples = currentState.failedSamples + 1;
+          setKitLoadingState(kitId, {
+            ...currentState,
+            failedSamples,
+            progress: currentState.totalSamples === 0
+              ? 1
+              : (currentState.loadedSamples + failedSamples) / currentState.totalSamples,
+          });
+          results[resultIndex] = { status: 'rejected', reason: error };
         }
-      };
-
-      // Preload all samples for all instruments
-      INSTRUMENT_TYPES.forEach(instrument => {
-        SAMPLE_DATA[instrument].forEach((sampleName, sampleIndex) => {
-          const samplePath = getSamplePath(instrument, sampleName);
-          const sampleKey = getSampleKey(instrument, sampleIndex);
-
-          try {
-            const player = new Tone.Player({
-              url: samplePath,
-              onload: () => {
-                if (globalSampleCache && globalSampleCache.has(sampleKey)) {
-                  const entry = globalSampleCache.get(sampleKey)!;
-                  entry.loaded = true;
-                  
-                  updateLoadingState({
-                    loadedSamples: globalLoadingState.loadedSamples + 1
-                  });
-                }
-                checkCompletion();
-              },
-              onerror: (error) => {
-                console.error(`Failed to load sample ${samplePath}:`, error);
-                
-                if (globalSampleCache && globalSampleCache.has(sampleKey)) {
-                  const entry = globalSampleCache.get(sampleKey)!;
-                  entry.error = error instanceof Error ? error : new Error(String(error));
-                  
-                  updateLoadingState({
-                    failedSamples: globalLoadingState.failedSamples + 1
-                  });
-                }
-                checkCompletion();
-              }
-            });
-
-            // Store in cache
-            if (globalSampleCache) {
-              globalSampleCache.set(sampleKey, {
-                player,
-                loaded: false
-              });
-            }
-
-          } catch (error) {
-            console.error(`Error creating player for ${samplePath}:`, error);
-            updateLoadingState({
-              failedSamples: globalLoadingState.failedSamples + 1
-            });
-            checkCompletion();
-          }
-        });
-      });
-    });
-
-    return initializationPromise;
-  }, [updateLoadingState]);
-
-  // Initialize on first mount
-  useEffect(() => {
-    mountedRef.current = true;
-    
-    if (!isInitialized) {
-      initializeSampleCache();
-    } else {
-      // If already initialized, just update the local state
-      setLoadingState({ ...globalLoadingState });
-    }
-
-    return () => {
-      mountedRef.current = false;
-    };
-  }, [initializeSampleCache]);
-
-  // Cleanup function to dispose all preloaded samples
-  useEffect(() => {
-    return () => {
-      // Only dispose if this is the last component using the preloader
-      // In a real app, you might want to implement reference counting
-      // For now, we'll dispose on app unmount (handled by the main component)
-    };
-  }, []);
-
-  // Get preloaded player instance
-  const getPlayer = useCallback((instrument: InstrumentType, sampleIndex: number): Tone.Player | null => {
-    if (!globalSampleCache) {
-      console.warn('Sample cache not initialized');
-      return null;
-    }
-
-    // Validate input parameters
-    if (!INSTRUMENT_TYPES.includes(instrument)) {
-      console.warn(`Invalid instrument type: ${instrument}`);
-      return null;
-    }
-
-    if (sampleIndex < 0 || sampleIndex >= SAMPLE_DATA[instrument].length) {
-      console.warn(`Invalid sample index ${sampleIndex} for instrument ${instrument}`);
-      return null;
-    }
-
-    const sampleKey = getSampleKey(instrument, sampleIndex);
-    const cacheEntry = globalSampleCache.get(sampleKey);
-    
-    if (!cacheEntry) {
-      console.warn(`Sample not found in cache: ${sampleKey}`);
-      return null;
-    }
-
-    if (cacheEntry.error) {
-      console.warn(`Sample failed to load: ${sampleKey}`, cacheEntry.error);
-      // Try to return the first sample of the same instrument as fallback
-      const fallbackKey = getSampleKey(instrument, 0);
-      const fallbackEntry = globalSampleCache.get(fallbackKey);
-      if (fallbackEntry && !fallbackEntry.error) {
-        return fallbackEntry.player;
       }
-      return null;
+    };
+
+    await Promise.all(
+      Array.from(
+        { length: Math.min(KIT_PRELOAD_CONCURRENCY, samplesToLoad.length) },
+        () => loadNextSample()
+      )
+    );
+
+    if (generation !== cacheGeneration) return;
+
+    const failureCount = results.filter((result) => result.status === 'rejected').length;
+    if (failureCount > 0) {
+      const message = `Failed to load ${failureCount} sample${failureCount === 1 ? '' : 's'} from ${DRUM_KITS[kitId].name}.`;
+      const currentState = getKitLoadingState(kitId);
+      setKitLoadingState(kitId, {
+        ...currentState,
+        status: 'error',
+        error: message,
+      });
+      throw new Error(message);
     }
 
-    return cacheEntry.player;
-  }, []);
+    setKitLoadingState(kitId, {
+      status: 'ready',
+      totalSamples: samples.length,
+      loadedSamples: samples.length,
+      failedSamples: 0,
+      progress: 1,
+      error: null,
+    });
+  })();
 
-  // Check if a specific sample is loaded
-  const isLoaded = useCallback((instrument: InstrumentType, sampleIndex: number): boolean => {
-    if (!globalSampleCache) {
-      return false;
+  kitLoadingPromises.set(kitId, loadPromise);
+  void loadPromise.finally(() => {
+    if (kitLoadingPromises.get(kitId) === loadPromise) {
+      kitLoadingPromises.delete(kitId);
+    }
+  }).catch(() => {
+    // The caller receives the original rejection. This only handles the
+    // promise returned by finally so it does not become unhandled.
+  });
+
+  return loadPromise;
+};
+
+export const useSamplePreloader = (
+  activeKitId?: DrumKitId,
+  watchSample?: SampleWatch
+): UseSamplePreloaderReturn => {
+  const watchedInstrument = watchSample?.instrument;
+  const watchedSampleIndex = watchSample?.sampleIndex;
+  const watchedSampleKey = activeKitId && watchedInstrument !== undefined && watchedSampleIndex !== undefined
+    ? getSampleKey(activeKitId, watchedInstrument, watchedSampleIndex)
+    : null;
+  const subscribeToStore = useCallback((listener: () => void) => {
+    if (!watchedSampleKey) return subscribe(listener);
+
+    const keyListeners = sampleListeners.get(watchedSampleKey) ?? new Set<() => void>();
+    keyListeners.add(listener);
+    sampleListeners.set(watchedSampleKey, keyListeners);
+
+    return () => {
+      keyListeners.delete(listener);
+      if (keyListeners.size === 0) sampleListeners.delete(watchedSampleKey);
+    };
+  }, [watchedSampleKey]);
+  const getStoreSnapshot = useCallback(() => (
+    watchedSampleKey ? sampleVersions.get(watchedSampleKey) ?? 0 : getSnapshot()
+  ), [watchedSampleKey]);
+  const cacheVersion = useSyncExternalStore(subscribeToStore, getStoreSnapshot, getServerSnapshot);
+
+  useEffect(() => {
+    if (!activeKitId) return;
+
+    // Get the currently selected voice ready first. The rest of the kit starts
+    // on the next task and is capped at four concurrent fetch/decode jobs.
+    if (watchedInstrument !== undefined && watchedSampleIndex !== undefined) {
+      void preloadSampleBuffer(
+        activeKitId,
+        watchedInstrument,
+        watchedSampleIndex
+      ).catch((error) => {
+        console.error(`Could not preload selected sample from ${activeKitId}:`, error);
+      });
     }
 
-    // Validate input parameters
-    if (!INSTRUMENT_TYPES.includes(instrument)) {
-      return false;
-    }
+    const preloadTimer = setTimeout(() => {
+      void preloadKitSamples(activeKitId).catch((error) => {
+        console.error(`Could not preload drum kit ${activeKitId}:`, error);
+      });
+    }, 0);
 
-    if (sampleIndex < 0 || sampleIndex >= SAMPLE_DATA[instrument].length) {
-      return false;
-    }
-
-    const sampleKey = getSampleKey(instrument, sampleIndex);
-    const cacheEntry = globalSampleCache.get(sampleKey);
-    
-    return cacheEntry?.loaded || false;
-  }, []);
+    return () => clearTimeout(preloadTimer);
+  }, [activeKitId, watchedInstrument, watchedSampleIndex]);
 
   return {
-    getPlayer,
-    isLoaded,
-    loadingProgress: loadingState.progress,
-    allSamplesLoaded: loadingState.progress >= 1,
-    loadingState
+    preloadKit: preloadKitSamples,
+    getBuffer: getPreloadedSampleBuffer,
+    isLoaded: isSampleBufferLoaded,
+    getKitLoadingState,
+    cacheVersion,
   };
 };
 
-/**
- * Utility function to dispose all preloaded samples
- * Should be called on application unmount
- */
 export const disposeSamplePreloader = (): void => {
-  if (globalSampleCache) {
-    globalSampleCache.forEach((entry) => {
-      try {
-        entry.player.dispose();
-      } catch (error) {
-        console.error('Error disposing sample player:', error);
-      }
-    });
-    
-    globalSampleCache.clear();
-    globalSampleCache = null;
-  }
-  
-  isInitialized = false;
-  initializationPromise = null;
-  globalLoadingState = {
-    totalSamples: 0,
-    loadedSamples: 0,
-    failedSamples: 0,
-    progress: 0
-  };
+  cacheGeneration += 1;
+  sampleBufferCache.forEach((buffer) => buffer.dispose());
+  sampleBufferCache.clear();
+  sampleLoadingPromises.clear();
+  kitLoadingStates.clear();
+  kitLoadingPromises.clear();
+  sampleVersions.clear();
+  sampleListeners.forEach((keyListeners) => keyListeners.forEach((listener) => listener()));
+  notify();
 };

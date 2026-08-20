@@ -8,8 +8,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-quantico);
-  --font-mono: var(--font-quantico);
+  --font-sans: "DotGothic16", "DotGothic16 Fallback", ui-monospace, monospace;
+  --font-mono: "DotGothic16", "DotGothic16 Fallback", ui-monospace, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,10 +19,18 @@
   }
 }
 
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-quantico), monospace;
+  font-family: var(--font-dot-gothic-16), monospace;
+  overscroll-behavior: none;
 }
 
 /* Custom slider styles */
@@ -62,5 +70,3 @@ body {
   background: #374151;
   border: none;
 }
-
-

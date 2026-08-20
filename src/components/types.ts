@@ -11,13 +11,14 @@ export interface ParticleParams {
 }
 
 export interface WallHitHandler {
-  (wall: string, position: THREE.Vector3): void;
+  (wall: string, time?: number): void;
 }
 
 export interface ParticleBoxProps {
   useLighting?: boolean;
   particleCount?: number;
-  onWallHit?: () => void; // Add this for quantization hits
+  onWallHit?: (time?: number) => void;
+  onCollisionHit?: (time?: number) => void;
   trackIndex?: number;
 }
 

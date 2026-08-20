@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useCallback, useState, useRef, useEffect } from 'react';
-import * as THREE from 'three';
 import { ParticleScene } from './ParticleScene';
 import { ParticleParams, ParticleBoxProps } from './types';
-import { useCollisionPlayback } from '@/hooks/useCollisionPlayback';
 import { InlineTooltip } from './Tutorial/InlineTooltip';
 import { useTutorial } from './Tutorial/TutorialContext';
+import { isPageBackgrounded } from '@/services/backgroundParticleClock';
 
 const SPEED_RANGE: [number, number] = [0, 4];
 const SIZE_RANGE: [number, number] = [2, 10];
@@ -16,6 +15,7 @@ export const ParticleBox: React.FC<ParticleBoxProps> = ({
   useLighting = false,
   particleCount: externalParticleCount,
   onWallHit: onQuantizationHit,
+  onCollisionHit,
   trackIndex = 0
 }) => {
   const [particleParams, setParticleParams] = useState<ParticleParams>({
@@ -23,10 +23,7 @@ export const ParticleBox: React.FC<ParticleBoxProps> = ({
     size: 1,
   });
   const [flashingWalls, setFlashingWalls] = useState<Set<string>>(new Set());
-  const [internalParticleCount, _] = useState<number>(DEFAULT_PARTICLE_COUNT);
-
-  // Use collision playback hook for immediate audio
-  const { onCollisionHit } = useCollisionPlayback(trackIndex);
+  const [internalParticleCount] = useState<number>(DEFAULT_PARTICLE_COUNT);
 
   // Tutorial state
   const { isTutorialActive } = useTutorial();
@@ -39,43 +36,44 @@ export const ParticleBox: React.FC<ParticleBoxProps> = ({
 
   // Cleanup all timeouts on unmount
   useEffect(() => {
+    const timeoutRefs = timeoutRefsRef.current;
+
     return () => {
-      timeoutRefsRef.current.forEach(timeout => clearTimeout(timeout));
-      timeoutRefsRef.current.clear();
+      timeoutRefs.forEach(timeout => clearTimeout(timeout));
+      timeoutRefs.clear();
     };
   }, []);
 
-  const handleWallHit = useCallback((wall: string, position: THREE.Vector3) => {
-    // Trigger wall flash (existing functionality)
-    setFlashingWalls(prev => new Set(prev).add(wall));
+  const handleWallHit = useCallback((wall: string, time?: number) => {
+    // Visual feedback stays on the visual clock. Hidden-tab collisions still
+    // reach the audio callbacks without creating throttled UI timers.
+    if (!isPageBackgrounded()) {
+      setFlashingWalls(prev => new Set(prev).add(wall));
 
-    // Clear any existing timeout for this wall to prevent accumulation
-    const existingTimeout = timeoutRefsRef.current.get(wall);
-    if (existingTimeout) {
-      clearTimeout(existingTimeout);
+      const existingTimeout = timeoutRefsRef.current.get(wall);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+      }
+
+      const timeout = setTimeout(() => {
+        setFlashingWalls(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(wall);
+          return newSet;
+        });
+        timeoutRefsRef.current.delete(wall);
+      }, 150);
+
+      timeoutRefsRef.current.set(wall, timeout);
     }
-
-    // Set new timeout and store reference
-    const timeout = setTimeout(() => {
-      setFlashingWalls(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(wall);
-        return newSet;
-      });
-      // Clean up the timeout reference
-      timeoutRefsRef.current.delete(wall);
-    }, 150);
-
-    // Store the timeout reference
-    timeoutRefsRef.current.set(wall, timeout);
 
     // Call quantization callback if provided (for building patterns)
     if (onQuantizationHit) {
-      onQuantizationHit();
+      onQuantizationHit(time);
     }
 
     // Call collision playback (for immediate audio when quantization is off)
-    onCollisionHit();
+    onCollisionHit?.(time);
   }, [onQuantizationHit, onCollisionHit]);
 
   return (
@@ -109,4 +107,4 @@ export const ParticleBox: React.FC<ParticleBoxProps> = ({
       )}
     </div>
   );
-}; 
+};

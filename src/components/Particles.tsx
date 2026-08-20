@@ -4,9 +4,10 @@ import { useAtomValue } from 'jotai';
 import { backgroundColorAtom, isPlayingAtom, getFreezeAtom } from '../store/atoms';
 import * as THREE from 'three';
 import { Particle } from './types';
+import { backgroundParticleClock, isPageBackgrounded } from '@/services/backgroundParticleClock';
 
 interface ParticlesProps {
-  onWallHit: (wall: string, position: THREE.Vector3) => void;
+  onWallHit: (wall: string, time?: number) => void;
   speedMultiplier?: number;
   sizeMultiplier?: number;
   particleCount?: number;
@@ -24,6 +25,9 @@ export const Particles: React.FC<ParticlesProps> = ({
 }) => {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const particlesRef = useRef<Particle[]>([]);
+  const matrixRef = useRef(new THREE.Matrix4());
+  const rotationRef = useRef(new THREE.Quaternion());
+  const scaleRef = useRef(new THREE.Vector3());
   const backgroundColor = useAtomValue(backgroundColorAtom);
   const globalIsPlaying = useAtomValue(isPlayingAtom);
   const freezeEnabled = useAtomValue(getFreezeAtom(trackIndex));
@@ -66,7 +70,7 @@ export const Particles: React.FC<ParticlesProps> = ({
     if (particlesRef.current.length === 0) {
       particlesRef.current = createInitialParticles(particleCount);
     }
-  }, []); // Empty dependency array - only run once
+  }, [createInitialParticles, particleCount]);
 
   // Handle particle count changes by preserving existing particles
   useEffect(() => {
@@ -92,12 +96,14 @@ export const Particles: React.FC<ParticlesProps> = ({
     }
   }, [particleCount]);
 
-  useFrame((state, delta) => {
-    if (!meshRef.current) return;
-
-    const matrix = new THREE.Matrix4();
+  const advanceParticles = useCallback((delta: number, renderMesh: boolean, time?: number) => {
+    const mesh = meshRef.current;
+    const matrix = matrixRef.current;
+    const rotation = rotationRef.current;
+    const scaleVector = scaleRef.current;
     const cameraPosition = camera.position;
     const particles = particlesRef.current;
+    const movement = globalIsPlaying ? delta * speedMultiplier : 0;
 
     particles.forEach((particle, index) => {
       if (index >= particleCount) return;
@@ -114,8 +120,7 @@ export const Particles: React.FC<ParticlesProps> = ({
       const actualRadius = particleRadius * scale;
 
       // Update position with speed multiplier AND global play state
-      const effectiveSpeedMultiplier = globalIsPlaying ? speedMultiplier : 0;
-      particle.position.add(particle.velocity.clone().multiplyScalar(delta * effectiveSpeedMultiplier));
+      particle.position.addScaledVector(particle.velocity, movement);
 
       // Bounce off walls and trigger ripple effects (using actual particle size)
       if (particle.position.x > cubeHalf - actualRadius || particle.position.x < -cubeHalf + actualRadius) {
@@ -123,38 +128,52 @@ export const Particles: React.FC<ParticlesProps> = ({
         particle.position.x = Math.max(-cubeHalf + actualRadius, Math.min(cubeHalf - actualRadius, particle.position.x));
 
         // Trigger ripple effect
-        onWallHit(
-          particle.position.x > 0 ? 'right' : 'left',
-          particle.position.clone()
-        );
+        onWallHit(particle.position.x > 0 ? 'right' : 'left', time);
       }
       if (particle.position.y > cubeHalf - actualRadius || particle.position.y < -cubeHalf + actualRadius) {
         particle.velocity.y *= -1;
         particle.position.y = Math.max(-cubeHalf + actualRadius, Math.min(cubeHalf - actualRadius, particle.position.y));
 
         // Trigger ripple effect
-        onWallHit(
-          particle.position.y > 0 ? 'top' : 'bottom',
-          particle.position.clone()
-        );
+        onWallHit(particle.position.y > 0 ? 'top' : 'bottom', time);
       }
       if (particle.position.z > cubeHalf - actualRadius || particle.position.z < -cubeHalf + actualRadius) {
         particle.velocity.z *= -1;
         particle.position.z = Math.max(-cubeHalf + actualRadius, Math.min(cubeHalf - actualRadius, particle.position.z));
 
         // Trigger ripple effect
-        onWallHit(
-          particle.position.z > 0 ? 'front' : 'back',
-          particle.position.clone()
-        );
+        onWallHit(particle.position.z > 0 ? 'front' : 'back', time);
       }
 
       // Update instance matrix with position and scale
-      matrix.compose(particle.position, new THREE.Quaternion(), new THREE.Vector3(scale, scale, scale));
-      meshRef.current!.setMatrixAt(index, matrix);
+      if (renderMesh && mesh) {
+        scaleVector.setScalar(scale);
+        matrix.compose(particle.position, rotation, scaleVector);
+        mesh.setMatrixAt(index, matrix);
+      }
     });
 
-    meshRef.current.instanceMatrix.needsUpdate = true;
+    if (renderMesh && mesh) {
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+  }, [camera, cubeHalf, globalIsPlaying, onWallHit, particleCount, particleRadius, sizeMultiplier, speedMultiplier]);
+
+  useEffect(() => {
+    return backgroundParticleClock.subscribe((time, delta) => {
+      advanceParticles(delta, false, time);
+    });
+  }, [advanceParticles]);
+
+  useFrame((_state, delta) => {
+    if (isPageBackgrounded()) {
+      // The worker-backed clock owns movement while unfocused. If the browser
+      // still paints this canvas, render the latest simulated positions only.
+      advanceParticles(0, true);
+      return;
+    }
+
+    // Avoid a large simulation leap when a suspended or obscured canvas returns.
+    advanceParticles(Math.min(delta, 1 / 30), true);
   });
 
   return (
@@ -174,4 +193,4 @@ export const Particles: React.FC<ParticlesProps> = ({
       )}
     </instancedMesh>
   );
-}; 
+};

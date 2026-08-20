@@ -1,5 +1,5 @@
 import { atom } from 'jotai';
-import { SAMPLE_DATA } from '@/utils/samples';
+import { DEFAULT_DRUM_KIT_ID, type DrumKitId } from '@/utils/samples';
 
 // Global play state atom
 export const isPlayingAtom = atom(false);
@@ -68,6 +68,20 @@ export const sampleIndex1Atom = atom(0);
 export const sampleIndex2Atom = atom(0);
 export const sampleIndex3Atom = atom(0);
 export const sampleIndex4Atom = atom(0);
+
+// The active kit and all four sample indexes change together so no track can
+// briefly point at an out-of-range sample from the previous kit.
+export const selectedDrumKitIdAtom = atom<DrumKitId>(DEFAULT_DRUM_KIT_ID);
+export const selectDrumKitAtom = atom(
+  null,
+  (_get, set, kitId: DrumKitId) => {
+    set(sampleIndex1Atom, 0);
+    set(sampleIndex2Atom, 0);
+    set(sampleIndex3Atom, 0);
+    set(sampleIndex4Atom, 0);
+    set(selectedDrumKitIdAtom, kitId);
+  }
+);
 
 // Helper function to get atoms by index
 export const getParticleCountAtom = (index: number) => {
@@ -148,4 +162,16 @@ export const getTrackVolumeAtom = (index: number) => {
     case 3: return trackVolume4Atom;
     default: throw new Error(`Invalid track index: ${index}`);
   }
-}; 
+};
+
+// MIDI sync state atoms
+export type SyncMode = 'internal' | 'follower' | 'leader';
+
+export const midiSupportedAtom = atom(false);
+export const midiInitializedAtom = atom(false);
+export const syncModeAtom = atom<SyncMode>('internal');
+export const midiInputsAtom = atom<{ id: string; name: string }[]>([]);
+export const midiOutputsAtom = atom<{ id: string; name: string }[]>([]);
+export const selectedMidiInputIdAtom = atom<string | null>(null);
+export const selectedMidiOutputIdAtom = atom<string | null>(null);
+export const midiDetectedBpmAtom = atom<number | null>(null);

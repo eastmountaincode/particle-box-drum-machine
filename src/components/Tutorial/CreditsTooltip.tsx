@@ -10,7 +10,7 @@ export const CreditsTooltip: React.FC<CreditsTooltipProps> = ({ isVisible }) => 
     if (!isVisible) return null;
 
     return (
-        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
+        <div className="absolute bottom-4 left-1/2 z-50 -translate-x-1/2 transform">
             <div className="bg-black border border-white border-opacity-50 shadow-2xl p-3 text-center">
                 <div className="text-xs leading-relaxed text-white">
                     <div className="font-bold mb-1">Created by Andrew Boylan</div>

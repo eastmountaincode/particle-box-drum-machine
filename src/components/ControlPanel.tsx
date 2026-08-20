@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { useAtom } from 'jotai';
-import { getSampleIndexAtom, getQuantizationAtom, getFreezeAtom, getMuteAtom, getTrackVolumeAtom } from '@/store/atoms';
+import { useAtom, useAtomValue } from 'jotai';
+import { getSampleIndexAtom, getQuantizationAtom, getFreezeAtom, getMuteAtom, getTrackVolumeAtom, selectedDrumKitIdAtom } from '@/store/atoms';
 import { getInstrumentForTrack, getSampleName, getSampleCount } from '@/utils/samples';
 import { InlineTooltip } from './Tutorial/InlineTooltip';
 import { useTutorial } from './Tutorial/TutorialContext';
@@ -30,9 +30,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   const [freezeEnabled, setFreezeEnabled] = useAtom(getFreezeAtom(trackNumber - 1));
   const [muteEnabled, setMuteEnabled] = useAtom(getMuteAtom(trackNumber - 1));
   const [trackVolume, setTrackVolume] = useAtom(getTrackVolumeAtom(trackNumber - 1));
+  const selectedKitId = useAtomValue(selectedDrumKitIdAtom);
   const instrument = getInstrumentForTrack(trackNumber - 1);
-  const currentSample = getSampleName(instrument, sampleIndex);
-  const sampleCount = getSampleCount(instrument);
+  const currentSample = getSampleName(selectedKitId, instrument, sampleIndex);
+  const sampleCount = getSampleCount(selectedKitId, instrument);
 
   // Tutorial state
   const { isTutorialActive } = useTutorial();
@@ -127,7 +128,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
               ←
             </button>
             <div className="flex-2 h-full bg-black text-white text-xs flex items-center justify-center border-r border-white border-opacity-50 px-1">
-              <span className="truncate text-center">{currentSample.replace('.WAV', '')}</span>
+              <span className="truncate text-center">{currentSample}</span>
             </div>
             <button
               onClick={handleSampleNext}

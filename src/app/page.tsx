@@ -2,53 +2,48 @@
 
 import { ParticleBox } from '@/components/ParticleBox';
 import { ControlPanel } from '@/components/ControlPanel';
+import { DrumKitsModal } from '@/components/DrumKitsModal';
 import { GlobalControls } from '@/components/GlobalControls';
+import { MidiClockModal } from '@/components/MidiClockModal';
+import { ReverbModal } from '@/components/ReverbModal';
 import { SequencerDisplay } from '@/components/SequencerDisplay';
 import { TutorialProvider } from '@/components/Tutorial/TutorialContext';
 import { CreditsTooltip } from '@/components/Tutorial/CreditsTooltip';
 import { useTutorial } from '@/components/Tutorial/TutorialContext';
 import { useAtom } from 'jotai';
 import { getParticleCountAtom, getLightingAtom, currentStepAtom, isPlayingAtom, getSequencerStepsAtom, visualModeAtom } from '@/store/atoms';
-import { useState, useEffect } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useAudioEngine } from '@/hooks/useAudioEngine';
+import { useMidi } from '@/hooks/useMidi';
 import { useRandomizeSamples } from '@/hooks/useRandomizeSamples';
 import { useRandomizeParticleCounts } from '@/hooks/useRandomizeParticleCounts';
+import { useCollisionPlayback } from '@/hooks/useCollisionPlayback';
+import { useDrumSamples } from '@/hooks/useDrumSamples';
 import { useQuantization } from '@/hooks/useQuantization';
 import { useTrackSamplePlayback } from '@/hooks/useTrackSamplePlayback';
-import { useSamplePreloader, disposeSamplePreloader } from '@/hooks/useSamplePreloader';
+import { disposeSamplePreloader } from '@/hooks/useSamplePreloader';
+import { useViewportScale } from '@/hooks/useViewportScale';
+
+const MIN_LAYOUT_WIDTH = 1200;
+const MIN_LAYOUT_HEIGHT = 720;
 
 export default function Home() {
     const [bpm, setBpm] = useState(120);
     const [currentStep] = useAtom(currentStepAtom);
-    const [_, setGlobalIsPlaying] = useAtom(isPlayingAtom);
+    const [, setGlobalIsPlaying] = useAtom(isPlayingAtom);
     const [visualMode] = useAtom(visualModeAtom);
-    const [screenWidth, setScreenWidth] = useState(0);
+    const viewport = useViewportScale(MIN_LAYOUT_WIDTH, MIN_LAYOUT_HEIGHT, {
+        allowNarrowWidth: visualMode,
+    });
 
-    const { isPlaying, start, stop, registerStepCallback, unregisterStepCallback } = useAudioEngine(bpm);
+    const { isPlaying, start, stop, registerStepCallback, unregisterStepCallback, handleExternalStep, handleExternalStart, handleExternalContinue, handleExternalStop } = useAudioEngine(bpm);
 
-    // Check screen width on mount and resize
-    useEffect(() => {
-        const checkScreenWidth = () => {
-            setScreenWidth(window.innerWidth);
-        };
-
-        // Initial check
-        checkScreenWidth();
-
-        // Add resize listener
-        window.addEventListener('resize', checkScreenWidth);
-
-        // Cleanup
-        return () => window.removeEventListener('resize', checkScreenWidth);
-    }, []);
+    const midi = useMidi({ handleExternalStep, handleExternalStart, handleExternalContinue, handleExternalStop });
 
     // Sync audio engine state with global atom
     useEffect(() => {
         setGlobalIsPlaying(isPlaying);
     }, [isPlaying, setGlobalIsPlaying]);
-
-    // Initialize sample preloader early in the application lifecycle
-    useSamplePreloader();
 
     // Randomize samples and particle counts on client-side mount
     useRandomizeSamples();
@@ -69,33 +64,44 @@ export default function Home() {
         }
     };
 
-    // Show message for narrow screens
-    if (screenWidth < 1140 && screenWidth > 0) {
-        return (
-            <div className="w-full h-screen bg-black flex items-center justify-center border border-white border-opacity-50">
-                <div className="text-center p-8 border border-white border-opacity-50 bg-black">
-                    <h1 className="text-white text-2xl mb-4 font-mono">PARTICLE BOX DRUM MACHINE</h1>
-                    <p className="text-white text-lg mb-2">This application requires a wider screen</p>
-                    <p className="text-white text-sm opacity-75">Minimum width: 1140px</p>
-                    <p className="text-white text-sm opacity-75">Current width: {screenWidth}px</p>
-                </div>
-            </div>
-        );
-    }
-
     return (
-        <TutorialProvider>
-            <MainContent 
-                isPlaying={isPlaying}
-                currentStep={currentStep}
-                bpm={bpm}
-                onPlayStop={handlePlayStop}
-                onBpmChange={setBpm}
-                registerStepCallback={registerStepCallback}
-                unregisterStepCallback={unregisterStepCallback}
-                visualMode={visualMode}
-            />
-        </TutorialProvider>
+        <main
+            ref={viewport.containerRef}
+            className="fixed inset-0 overflow-hidden bg-black"
+            data-testid="app-viewport"
+        >
+            {viewport.isReady && (
+                <div
+                    data-testid="app-canvas"
+                    data-layout-mode={visualMode ? 'column' : 'full'}
+                    data-scale={viewport.scale.toFixed(4)}
+                    style={{
+                        position: 'absolute',
+                        left: `${viewport.offsetX}px`,
+                        top: `${viewport.offsetY}px`,
+                        width: `${viewport.logicalWidth}px`,
+                        height: `${viewport.logicalHeight}px`,
+                        transform: `scale(${viewport.scale})`,
+                        transformOrigin: 'top left',
+                        containerType: 'size',
+                    }}
+                >
+                    <TutorialProvider>
+                        <MainContent
+                            isPlaying={isPlaying}
+                            currentStep={currentStep}
+                            bpm={bpm}
+                            onPlayStop={handlePlayStop}
+                            onBpmChange={setBpm}
+                            registerStepCallback={registerStepCallback}
+                            unregisterStepCallback={unregisterStepCallback}
+                            visualMode={visualMode}
+                            midi={midi}
+                        />
+                    </TutorialProvider>
+                </div>
+            )}
+        </main>
     );
 }
 
@@ -105,18 +111,22 @@ const MainContent: React.FC<{
     bpm: number;
     onPlayStop: () => void;
     onBpmChange: (bpm: number) => void;
-    registerStepCallback: (trackIndex: number, callback: (step: number) => void) => void;
+    registerStepCallback: (trackIndex: number, callback: (step: number, time?: number) => void) => void;
     unregisterStepCallback: (trackIndex: number) => void;
     visualMode: boolean;
-}> = ({ isPlaying, currentStep, bpm, onPlayStop, onBpmChange, registerStepCallback, unregisterStepCallback, visualMode }) => {
+    midi: ReturnType<typeof useMidi>;
+}> = ({ isPlaying, currentStep, bpm, onPlayStop, onBpmChange, registerStepCallback, unregisterStepCallback, visualMode, midi }) => {
     const { isTutorialActive } = useTutorial();
 
     return (
         <>
-            <div className="w-full h-screen bg-black p-4 pl-8 pr-8 pb-8 border border-white border-opacity-50">
+            <div className="h-full w-full border border-white border-opacity-50 bg-black p-4 pr-8 pb-8 pl-8">
                 <div className="w-full h-full flex flex-col gap-3">
-                    {/* Global Drum Sequencer Controls */}
-                    <div className="flex justify-center">
+                    {/* Global transport and compact settings launchers */}
+                    <header
+                        className="flex shrink-0 items-center justify-center gap-3"
+                        data-testid="app-header"
+                    >
                         <GlobalControls
                             isPlaying={isPlaying}
                             currentStep={currentStep}
@@ -124,7 +134,14 @@ const MainContent: React.FC<{
                             onPlayStop={onPlayStop}
                             onBpmChange={onBpmChange}
                         />
-                    </div>
+                        {!visualMode && (
+                            <div className="flex shrink-0 items-center gap-2">
+                                <DrumKitsModal />
+                                <ReverbModal />
+                                <MidiClockModal {...midi} isPlaying={isPlaying} />
+                            </div>
+                        )}
+                    </header>
 
                     {/* Track Rows */}
                     <div className={visualMode ? "flex flex-col gap-4" : "flex-1 flex flex-col gap-4"}>
@@ -134,7 +151,6 @@ const MainContent: React.FC<{
                                 index={index} 
                                 trackNumber={row} 
                                 currentStep={currentStep} 
-                                bpm={bpm}
                                 registerStepCallback={registerStepCallback}
                                 unregisterStepCallback={unregisterStepCallback}
                                 visualMode={visualMode}
@@ -154,31 +170,37 @@ const TrackRow: React.FC<{
     index: number; 
     trackNumber: number; 
     currentStep: number; 
-    bpm: number;
-    registerStepCallback: (trackIndex: number, callback: (step: number) => void) => void;
+    registerStepCallback: (trackIndex: number, callback: (step: number, time?: number) => void) => void;
     unregisterStepCallback: (trackIndex: number) => void;
     visualMode: boolean;
-}> = ({ index, trackNumber, currentStep, bpm, registerStepCallback, unregisterStepCallback, visualMode }) => {
+}> = ({ index, trackNumber, currentStep, registerStepCallback, unregisterStepCallback, visualMode }) => {
     const [particleCount, setParticleCount] = useAtom(getParticleCountAtom(index));
     const [useLighting, setUseLighting] = useAtom(getLightingAtom(index));
     const [steps, setSteps] = useAtom(getSequencerStepsAtom(index));
+    const { playSample } = useDrumSamples(index);
+    const { onCollisionHit } = useCollisionPlayback(index, playSample);
 
-    const { registerHit } = useQuantization({
+    const { registerHit, onStepTriggered: onQuantizedStep } = useQuantization({
         trackIndex: index,
-        bpm
+        playSample,
     });
 
     // Per-track sample playback - now returns a callback instead of using useEffect
-    const { onStepTriggered } = useTrackSamplePlayback(index);
+    const { onStepTriggered } = useTrackSamplePlayback(index, playSample);
+
+    const handleStepTriggered = useCallback((step: number, time?: number) => {
+        onQuantizedStep(step, time);
+        onStepTriggered(step, time);
+    }, [onQuantizedStep, onStepTriggered]);
 
     // Register the step callback with the audio engine
     useEffect(() => {
-        registerStepCallback(index, onStepTriggered);
+        registerStepCallback(index, handleStepTriggered);
         
         return () => {
             unregisterStepCallback(index);
         };
-    }, [index, onStepTriggered, registerStepCallback, unregisterStepCallback]);
+    }, [handleStepTriggered, index, registerStepCallback, unregisterStepCallback]);
 
     const handleStepToggle = (stepIndex: number) => {
         const newSteps = [...steps];
@@ -189,19 +211,23 @@ const TrackRow: React.FC<{
     if (visualMode) {
         // Visual mode: Only show particle boxes, same size as tech mode
         return (
-            <div className="flex justify-center items-center" style={{ height: 'calc((100vh - 10rem) / 4)' }}>
+            <div
+                className="flex justify-center items-center"
+                data-testid={`track-row-${index}`}
+                style={{ height: 'calc((100cqh - 10rem) / 4)' }}
+            >
                 <div
                     className="border border-white border-opacity-50 flex-shrink-0"
                     style={{
-                        // Same size as tech mode
-                        width: 'min(calc(25vh - 1rem), calc(25vw - 1rem), calc((100vh - 10rem) / 4))',
-                        height: 'min(calc(25vh - 1rem), calc(25vw - 1rem), calc((100vh - 10rem) / 4))'
+                        width: 'min(100%, calc((100cqh - 10rem) / 4))',
+                        aspectRatio: '1 / 1'
                     }}
                 >
                     <ParticleBox
                         useLighting={useLighting}
                         particleCount={particleCount}
                         onWallHit={registerHit}
+                        onCollisionHit={onCollisionHit}
                         trackIndex={index}
                     />
                 </div>
@@ -211,19 +237,20 @@ const TrackRow: React.FC<{
 
     // Normal mode: Show all controls
     return (
-        <div className="flex-1 flex gap-4">
+        <div className="flex-1 flex gap-4" data-testid={`track-row-${index}`}>
             {/* Square particle box container */}
             <div
                 className="border border-white border-opacity-50 flex-shrink-0"
                 style={{
-                    width: 'min(calc(25vh - 1rem), calc(25vw - 1rem), calc((100vh - 10rem) / 4))',
-                    height: 'min(calc(25vh - 1rem), calc(25vw - 1rem), calc((100vh - 10rem) / 4))'
+                    width: 'min(calc(25cqh - 1rem), calc(25cqw - 1rem), calc((100cqh - 10rem) / 4))',
+                    height: 'min(calc(25cqh - 1rem), calc(25cqw - 1rem), calc((100cqh - 10rem) / 4))'
                 }}
             >
                 <ParticleBox
                     useLighting={useLighting}
                     particleCount={particleCount}
                     onWallHit={registerHit}
+                    onCollisionHit={onCollisionHit}
                     trackIndex={index}
                 />
             </div>
@@ -240,7 +267,7 @@ const TrackRow: React.FC<{
             </div>
 
             {/* Sequencer display takes remaining space */}
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
                 <SequencerDisplay
                     trackNumber={trackNumber}
                     currentStep={currentStep}

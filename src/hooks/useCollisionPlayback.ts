@@ -3,26 +3,27 @@
 import { useCallback } from 'react';
 import { useAtomValue } from 'jotai';
 import { getQuantizationAtom, getMuteAtom } from '@/store/atoms';
-import { useDrumSamples } from './useDrumSamples';
 
 interface UseCollisionPlaybackReturn {
-  onCollisionHit: () => void;
+  onCollisionHit: (time?: number) => void;
 }
 
-export const useCollisionPlayback = (trackIndex: number): UseCollisionPlaybackReturn => {
+export const useCollisionPlayback = (
+  trackIndex: number,
+  playSample: (velocity?: number, time?: number) => void
+): UseCollisionPlaybackReturn => {
   const quantizationEnabled = useAtomValue(getQuantizationAtom(trackIndex));
   const muteEnabled = useAtomValue(getMuteAtom(trackIndex));
-  const drumSamples = useDrumSamples(trackIndex);
 
-  const onCollisionHit = useCallback(() => {
+  const onCollisionHit = useCallback((time?: number) => {
     // Play sample immediately if quantization is OFF and not muted
     // (This handles both freeze ON and OFF cases when quantization is disabled)
     if (!quantizationEnabled && !muteEnabled) {
-      drumSamples.playSample();
+      playSample(1, time);
     }
-  }, [quantizationEnabled, muteEnabled, drumSamples, trackIndex]);
+  }, [quantizationEnabled, muteEnabled, playSample]);
 
   return {
     onCollisionHit
   };
-}; 
+};

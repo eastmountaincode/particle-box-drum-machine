@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { useSetAtom, useAtom } from 'jotai';
+import { useAtom } from 'jotai';
 import { IoRefresh, IoDesktopOutline } from 'react-icons/io5';
-import { getFreezeAtom, reverbWetAtom, reverbDecayAtom, reverbRoomSizeAtom, globalVolumeAtom, visualModeAtom } from '@/store/atoms';
+import { getFreezeAtom, globalVolumeAtom, visualModeAtom } from '@/store/atoms';
 import { TutorialButton } from './Tutorial/TutorialButton';
 import { InlineTooltip } from './Tutorial/InlineTooltip';
 import { useTutorial } from './Tutorial/TutorialContext';
@@ -31,21 +31,12 @@ export const GlobalControls: React.FC<GlobalControlsProps> = ({
     // Visual mode state
     const [visualMode, setVisualMode] = useAtom(visualModeAtom);
 
-    // Get setters for all freeze atoms
-    const setFreeze1 = useSetAtom(getFreezeAtom(0));
-    const setFreeze2 = useSetAtom(getFreezeAtom(1));
-    const setFreeze3 = useSetAtom(getFreezeAtom(2));
-    const setFreeze4 = useSetAtom(getFreezeAtom(3));
-
-    // Reverb parameters - separate local state for smooth dragging
-    const [reverbWet, setReverbWet] = useAtom(reverbWetAtom);
-    const [reverbDecay, setReverbDecay] = useAtom(reverbDecayAtom);
-    const [reverbRoomSize, setReverbRoomSize] = useAtom(reverbRoomSizeAtom);
-
-    // Local state for smooth slider interaction
-    const [localReverbWet, setLocalReverbWet] = useState(reverbWet);
-    const [localReverbDecay, setLocalReverbDecay] = useState(reverbDecay);
-    const [localReverbRoomSize, setLocalReverbRoomSize] = useState(reverbRoomSize);
+    // Read every track so the global action also reflects partial freeze states.
+    const [freeze1, setFreeze1] = useAtom(getFreezeAtom(0));
+    const [freeze2, setFreeze2] = useAtom(getFreezeAtom(1));
+    const [freeze3, setFreeze3] = useAtom(getFreezeAtom(2));
+    const [freeze4, setFreeze4] = useAtom(getFreezeAtom(3));
+    const anyTrackFrozen = freeze1 || freeze2 || freeze3 || freeze4;
 
     // Global volume
     const [globalVolume, setGlobalVolume] = useAtom(globalVolumeAtom);
@@ -57,25 +48,12 @@ export const GlobalControls: React.FC<GlobalControlsProps> = ({
         setInputValue(bpm.toString());
     }, [bpm]);
 
-    // Sync local state with atoms when they change from other sources
-    useEffect(() => {
-        setLocalReverbWet(reverbWet);
-    }, [reverbWet]);
-
-    useEffect(() => {
-        setLocalReverbDecay(reverbDecay);
-    }, [reverbDecay]);
-
-    useEffect(() => {
-        setLocalReverbRoomSize(reverbRoomSize);
-    }, [reverbRoomSize]);
-
-    const handleFreezeAll = () => {
-        // Trigger freeze for all tracks
-        setFreeze1(true);
-        setFreeze2(true);
-        setFreeze3(true);
-        setFreeze4(true);
+    const handleFreezeAllToggle = () => {
+        const nextFreezeState = !anyTrackFrozen;
+        setFreeze1(nextFreezeState);
+        setFreeze2(nextFreezeState);
+        setFreeze3(nextFreezeState);
+        setFreeze4(nextFreezeState);
     };
 
     const handleRefresh = () => {
@@ -94,7 +72,7 @@ export const GlobalControls: React.FC<GlobalControlsProps> = ({
     }, [visualMode, isTutorialActive, setTutorialActive]);
 
     return (
-        <div className="flex items-center gap-4 bg-black border border-white border-opacity-50 p-2 pl-3 pr-3 select-none">
+        <div className="flex shrink-0 items-center gap-4 whitespace-nowrap bg-black border border-white border-opacity-50 p-2 pl-3 pr-3 select-none">
             {/* Play/Stop Button - Only show in tech mode */}
             {!visualMode && (
                 <button
@@ -186,74 +164,26 @@ export const GlobalControls: React.FC<GlobalControlsProps> = ({
                     {/* Freeze All Button with inline tooltip */}
                     <div className="relative">
                         <button
-                            onClick={handleFreezeAll}
-                            className="bg-black hover:bg-white hover:text-black text-white text-xs py-2 px-3 border border-white border-opacity-50 cursor-pointer"
+                            type="button"
+                            aria-label={anyTrackFrozen ? 'Unfreeze all tracks' : 'Freeze all tracks'}
+                            data-testid="freeze-all-toggle"
+                            onClick={handleFreezeAllToggle}
+                            className={`w-28 cursor-pointer border border-white border-opacity-50 px-3 py-2 text-center text-xs ${anyTrackFrozen
+                                ? 'bg-white text-black hover:bg-black hover:text-white'
+                                : 'bg-black text-white hover:bg-white hover:text-black'
+                                }`}
                         >
-                            FREEZE ALL
+                            {anyTrackFrozen ? 'UNFREEZE ALL' : 'FREEZE ALL'}
                         </button>
                         <InlineTooltip
-                            title="Freeze All"
-                            content="Freeze the patterns of all 4 tracks - basically, lock in the previous 16 hits for all tracks."
+                            title={anyTrackFrozen ? 'Unfreeze All' : 'Freeze All'}
+                            content={anyTrackFrozen
+                                ? 'Release every frozen track and return all patterns to live particle input.'
+                                : 'Freeze the patterns of all 4 tracks - basically, lock in the previous 16 hits for all tracks.'}
                             position="bottom"
                             width="w-80"
                             isVisible={isTutorialActive}
                         />
-                    </div>
-
-                    {/* Reverb Controls */}
-                    <div className="flex items-center gap-2">
-                        <span className="text-white text-xs">REVERB:</span>
-
-                        {/* Wet/Dry Control */}
-                        <div className="flex flex-col items-center">
-                            <span className="text-white text-xs mb-1">WET</span>
-                            <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.1"
-                                value={localReverbWet}
-                                onChange={(e) => setLocalReverbWet(parseFloat(e.target.value))}
-                                onMouseUp={(e) => setReverbWet(parseFloat((e.target as HTMLInputElement).value))}
-                                onTouchEnd={(e) => setReverbWet(parseFloat((e.target as HTMLInputElement).value))}
-                                className="w-16 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-                            />
-                            <span className="text-white text-xs mt-1">{localReverbWet.toFixed(1)}</span>
-                        </div>
-
-                        {/* Decay Control */}
-                        <div className="flex flex-col items-center">
-                            <span className="text-white text-xs mb-1">DECAY</span>
-                            <input
-                                type="range"
-                                min="0.1"
-                                max="10"
-                                step="0.1"
-                                value={localReverbDecay}
-                                onChange={(e) => setLocalReverbDecay(parseFloat(e.target.value))}
-                                onMouseUp={(e) => setReverbDecay(parseFloat((e.target as HTMLInputElement).value))}
-                                onTouchEnd={(e) => setReverbDecay(parseFloat((e.target as HTMLInputElement).value))}
-                                className="w-16 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-                            />
-                            <span className="text-white text-xs mt-1">{localReverbDecay.toFixed(1)}s</span>
-                        </div>
-
-                        {/* Room Size Control */}
-                        <div className="flex flex-col items-center">
-                            <span className="text-white text-xs mb-1">ROOM</span>
-                            <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.1"
-                                value={localReverbRoomSize}
-                                onChange={(e) => setLocalReverbRoomSize(parseFloat(e.target.value))}
-                                onMouseUp={(e) => setReverbRoomSize(parseFloat((e.target as HTMLInputElement).value))}
-                                onTouchEnd={(e) => setReverbRoomSize(parseFloat((e.target as HTMLInputElement).value))}
-                                className="w-16 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-                            />
-                            <span className="text-white text-xs mt-1">{localReverbRoomSize.toFixed(1)}</span>
-                        </div>
                     </div>
 
                     {/* Refresh Button with inline tooltip */}
@@ -294,4 +224,4 @@ export const GlobalControls: React.FC<GlobalControlsProps> = ({
             )}
         </div>
     );
-}; 
+};

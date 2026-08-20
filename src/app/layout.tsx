@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Handjet } from "next/font/google";
+import { DotGothic16 } from "next/font/google";
 import "./globals.css";
 
-const handjet = Handjet({
-  variable: "--font-handjet",
+const dotGothic16 = DotGothic16({
+  variable: "--font-dot-gothic-16",
   subsets: ["latin"],
-  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  weight: "400",
 });
 
 export const metadata: Metadata = {
@@ -19,12 +19,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${handjet.variable} antialiased`}
-      >
-        {children}
-      </body>
+    <html lang="en" className={dotGothic16.variable}>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }
