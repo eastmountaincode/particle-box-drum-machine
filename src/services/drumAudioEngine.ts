@@ -1,4 +1,8 @@
 import * as Tone from 'tone';
+import {
+  setAudioContextOutput,
+  type AudioOutputChannel,
+} from './audioOutput';
 
 const MAX_VOICES_PER_TRACK = 32;
 const VOICE_STEAL_FADE_SECONDS = 0.003;
@@ -38,6 +42,8 @@ class DrumAudioEngine {
   private reverbInput: Tone.Gain | null = null;
   private reverbReturn: Tone.Gain | null = null;
   private reverb: Tone.Reverb | null = null;
+  private outputPanner: StereoPannerNode | null = null;
+  private outputChannel: AudioOutputChannel = 'stereo';
   private trackBuses = new Map<number, TrackBus>();
   private activeVoices = new Map<number, ActiveVoice[]>();
   private globalVolume = 0.2;
@@ -87,6 +93,16 @@ class DrumAudioEngine {
     const bus = this.ensureTrack(trackIndex);
     bus.reverbEnabled = enabled;
     this.updateTrackMix(bus, true);
+  }
+
+  async setOutputDevice(deviceId: string): Promise<void> {
+    const context = Tone.getContext().rawContext as AudioContext;
+    await setAudioContextOutput(context, deviceId);
+  }
+
+  setOutputChannel(channel: AudioOutputChannel): void {
+    this.outputChannel = channel;
+    this.connectMasterOutput();
   }
 
   configureReverb(wet: number, decay: number, preDelay: number): void {
@@ -195,7 +211,7 @@ class DrumAudioEngine {
   private ensureGraph(): void {
     if (this.masterGain && this.reverbInput && this.reverbReturn && this.reverb) return;
 
-    const masterGain = new Tone.Gain(this.globalVolume).toDestination();
+    const masterGain = new Tone.Gain(this.globalVolume);
     const reverbInput = new Tone.Gain(1);
     const reverbReturn = new Tone.Gain(1);
     const reverb = this.createReverb();
@@ -208,6 +224,30 @@ class DrumAudioEngine {
     this.reverbInput = reverbInput;
     this.reverbReturn = reverbReturn;
     this.reverb = reverb;
+    this.connectMasterOutput();
+  }
+
+  private connectMasterOutput(): void {
+    const masterGain = this.masterGain;
+    if (!masterGain) return;
+
+    masterGain.disconnect();
+    this.outputPanner?.disconnect();
+
+    if (this.outputChannel === 'stereo') {
+      masterGain.toDestination();
+      return;
+    }
+
+    const context = Tone.getContext().rawContext;
+    const outputPanner = this.outputPanner ?? context.createStereoPanner();
+    this.outputPanner = outputPanner;
+    outputPanner.pan.setValueAtTime(
+      this.outputChannel === 'left' ? -1 : 1,
+      context.currentTime,
+    );
+    masterGain.connect(outputPanner);
+    outputPanner.connect(context.destination);
   }
 
   private ensureTrack(trackIndex: number): TrackBus {
@@ -334,10 +374,12 @@ class DrumAudioEngine {
     this.reverbInput?.dispose();
     this.reverbReturn?.dispose();
     this.masterGain?.dispose();
+    this.outputPanner?.disconnect();
     this.reverb = null;
     this.reverbInput = null;
     this.reverbReturn = null;
     this.masterGain = null;
+    this.outputPanner = null;
   }
 }
 

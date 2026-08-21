@@ -2,6 +2,7 @@
 
 import { ParticleBox } from '@/components/ParticleBox';
 import { ControlPanel } from '@/components/ControlPanel';
+import { AudioOutputModal } from '@/components/AudioOutputModal';
 import { DrumKitsModal } from '@/components/DrumKitsModal';
 import { GlobalControls } from '@/components/GlobalControls';
 import { MidiClockModal } from '@/components/MidiClockModal';
@@ -139,6 +140,7 @@ const MainContent: React.FC<{
                                 <DrumKitsModal />
                                 <ReverbModal />
                                 <MidiClockModal {...midi} isPlaying={isPlaying} />
+                                <AudioOutputModal />
                             </div>
                         )}
                     </header>
