@@ -19,6 +19,7 @@ interface UseAudioEngineReturn {
     stop: () => void;
     registerStepCallback: (trackIndex: number, callback: (step: number, time?: number) => void) => void;
     unregisterStepCallback: (trackIndex: number) => void;
+    prepareExternalClock: () => Promise<void>;
     handleExternalStep: (step: number) => void;
     handleExternalStart: () => void;
     handleExternalContinue: () => void;
@@ -231,6 +232,16 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
         });
     }, [setCurrentStep]);
 
+    const prepareExternalClock = useCallback(async () => {
+        try {
+            if (Tone.context.state !== 'running') {
+                await Tone.start();
+            }
+        } catch (error) {
+            console.warn('Audio context could not be prepared for MIDI clock:', error);
+        }
+    }, []);
+
     const handleExternalStart = useCallback(async () => {
         // Ensure audio context is running
         if (Tone.context.state !== 'running') {
@@ -388,6 +399,7 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
         stop,
         registerStepCallback,
         unregisterStepCallback,
+        prepareExternalClock,
         handleExternalStep,
         handleExternalStart,
         handleExternalContinue,

@@ -36,9 +36,9 @@ export default function Home() {
         allowNarrowWidth: visualMode,
     });
 
-    const { isPlaying, start, stop, registerStepCallback, unregisterStepCallback, handleExternalStep, handleExternalStart, handleExternalContinue, handleExternalStop } = useAudioEngine(bpm);
+    const { isPlaying, start, stop, registerStepCallback, unregisterStepCallback, prepareExternalClock, handleExternalStep, handleExternalStart, handleExternalContinue, handleExternalStop } = useAudioEngine(bpm);
 
-    const midi = useMidi({ handleExternalStep, handleExternalStart, handleExternalContinue, handleExternalStop });
+    const midi = useMidi({ prepareExternalClock, handleExternalStep, handleExternalStart, handleExternalContinue, handleExternalStop });
 
     // Sync audio engine state with global atom
     useEffect(() => {

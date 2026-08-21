@@ -17,6 +17,7 @@ import {
 } from '@/store/atoms';
 
 interface AudioEngineCallbacks {
+    prepareExternalClock: () => Promise<void>;
     handleExternalStep: (step: number) => void;
     handleExternalStart: () => void;
     handleExternalContinue: () => void;
@@ -24,6 +25,7 @@ interface AudioEngineCallbacks {
 }
 
 export const useMidi = (audioEngine: AudioEngineCallbacks) => {
+    const { prepareExternalClock } = audioEngine;
     const [midiSupported, setMidiSupported] = useAtom(midiSupportedAtom);
     const [midiInitialized, setMidiInitialized] = useAtom(midiInitializedAtom);
     const [syncMode, setSyncModeAtom] = useAtom(syncModeAtom);
@@ -102,12 +104,15 @@ export const useMidi = (audioEngine: AudioEngineCallbacks) => {
     }, [setSelectedOutputId]);
 
     const setSyncMode = useCallback((mode: SyncMode) => {
+        if (mode === 'follower') {
+            void prepareExternalClock();
+        }
         midiClockManager.setSyncMode(mode);
         setSyncModeAtom(mode);
         if (mode !== 'follower') {
             setDetectedBpm(null);
         }
-    }, [setSyncModeAtom, setDetectedBpm]);
+    }, [prepareExternalClock, setSyncModeAtom, setDetectedBpm]);
 
     const reinitAndRefresh = useCallback(async () => {
         const success = await midiService.reinitialize();
