@@ -242,24 +242,30 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
         }
     }, []);
 
-    const handleExternalStart = useCallback(async () => {
-        // Ensure audio context is running
-        if (Tone.context.state !== 'running') {
-            await Tone.start();
-        }
+    const handleExternalStart = useCallback(() => {
+        // Publish the transport state synchronously. MIDI Start and the first
+        // clock pulse may share a timestamp, so waiting for Tone.start() here
+        // would cause that first pulse (step 0) to be discarded.
         isStoppedRef.current = false;
         activateBackgroundSupport();
         setIsPlaying(true);
         setCurrentStep(0);
+        if (Tone.context.state !== 'running') {
+            void Tone.start().catch((error) => {
+                console.warn('Audio context could not resume for MIDI clock:', error);
+            });
+        }
     }, [activateBackgroundSupport, setCurrentStep]);
 
-    const handleExternalContinue = useCallback(async () => {
-        if (Tone.context.state !== 'running') {
-            await Tone.start();
-        }
+    const handleExternalContinue = useCallback(() => {
         isStoppedRef.current = false;
         activateBackgroundSupport();
         setIsPlaying(true);
+        if (Tone.context.state !== 'running') {
+            void Tone.start().catch((error) => {
+                console.warn('Audio context could not resume for MIDI clock:', error);
+            });
+        }
     }, [activateBackgroundSupport]);
 
     const handleExternalStop = useCallback(() => {

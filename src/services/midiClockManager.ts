@@ -17,7 +17,7 @@ export interface MidiClockCallbacks {
     onExternalStart: () => void;
     onExternalContinue: () => void;
     onExternalStop: () => void;
-    onDetectedBpmChange: (bpm: number) => void;
+    onDetectedBpmChange: (bpm: number | null) => void;
 }
 
 export class MidiClockManager {
@@ -82,6 +82,7 @@ export class MidiClockManager {
                 this.running = true;
                 this.globalTick = 0;
                 this.clockTimestamps = [];
+                this.callbacks?.onDetectedBpmChange(null);
                 this.callbacks?.onExternalStart();
                 break;
             case MIDI_CONTINUE:
@@ -113,7 +114,9 @@ export class MidiClockManager {
         if (this.clockTimestamps.length > this.BPM_SAMPLE_SIZE) {
             this.clockTimestamps.shift();
         }
-        if (this.clockTimestamps.length >= 2) {
+        // A full beat avoids publishing the wildly unstable estimate produced
+        // by only the first couple of clock intervals after transport starts.
+        if (this.clockTimestamps.length >= this.BPM_SAMPLE_SIZE) {
             const totalTime =
                 this.clockTimestamps[this.clockTimestamps.length - 1] -
                 this.clockTimestamps[0];

@@ -47,7 +47,7 @@ export const useMidi = (audioEngine: AudioEngineCallbacks) => {
             onExternalStart: audioEngine.handleExternalStart,
             onExternalContinue: audioEngine.handleExternalContinue,
             onExternalStop: audioEngine.handleExternalStop,
-            onDetectedBpmChange: (bpm: number) => setDetectedBpm(bpm),
+            onDetectedBpmChange: (bpm: number | null) => setDetectedBpm(bpm),
         });
 
         return () => {
