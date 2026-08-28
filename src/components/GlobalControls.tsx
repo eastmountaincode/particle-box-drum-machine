@@ -15,6 +15,8 @@ interface GlobalControlsProps {
     isPlaying: boolean;
     currentStep: number;
     bpm: number;
+    externalBpm: number | null;
+    isExternalClock: boolean;
     onPlayStop: () => void;
     onBpmChange: (bpm: number) => void;
 }
@@ -23,6 +25,8 @@ export const GlobalControls: React.FC<GlobalControlsProps> = ({
     isPlaying,
     currentStep,
     bpm,
+    externalBpm,
+    isExternalClock,
     onPlayStop,
     onBpmChange
 }) => {
@@ -99,44 +103,61 @@ export const GlobalControls: React.FC<GlobalControlsProps> = ({
                         <span className="text-white text-xs">BPM:</span>
                         <div className="flex items-center border border-white border-opacity-50">
                             <button
+                                type="button"
                                 onClick={() => onBpmChange(Math.max(MIN_BPM, bpm - 1))}
-                                className="bg-black hover:bg-white hover:text-black text-white text-xs px-2 py-1 border-r border-white border-opacity-50 cursor-pointer"
+                                disabled={isExternalClock}
+                                title={isExternalClock ? 'Tempo controlled by incoming MIDI clock' : undefined}
+                                className="cursor-pointer border-r border-white border-opacity-50 bg-black px-2 py-1 text-xs text-white hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-black disabled:hover:text-white"
                             >
                                 -
                             </button>
-                            <input
-                                type="number"
-                                value={inputValue}
-                                onChange={(e) => {
-                                    const value = e.target.value;
-                                    setInputValue(value);
+                            {isExternalClock ? (
+                                <output
+                                    aria-label="Detected MIDI clock BPM"
+                                    aria-live="polite"
+                                    className="w-16 bg-black px-2 py-1 text-center text-xs text-white"
+                                    data-testid="external-bpm-display"
+                                >
+                                    {externalBpm ?? '--'}
+                                </output>
+                            ) : (
+                                <input
+                                    type="number"
+                                    value={inputValue}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        setInputValue(value);
 
-                                    if (value === '') {
-                                        return; // Allow empty input
-                                    }
+                                        if (value === '') {
+                                            return; // Allow empty input
+                                        }
 
-                                    const newBpm = parseInt(value);
-                                    if (!isNaN(newBpm) && newBpm >= MIN_BPM && newBpm <= MAX_BPM) {
-                                        onBpmChange(newBpm);
-                                    }
-                                }}
-                                onBlur={() => {
-                                    const newBpm = parseInt(inputValue);
-                                    if (isNaN(newBpm) || newBpm < MIN_BPM) {
-                                        setInputValue(MIN_BPM.toString());
-                                        onBpmChange(MIN_BPM);
-                                    } else if (newBpm > MAX_BPM) {
-                                        setInputValue(MAX_BPM.toString());
-                                        onBpmChange(MAX_BPM);
-                                    }
-                                }}
-                                className="text-white text-xs bg-black px-2 py-1 w-16 text-center border-0 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                min={MIN_BPM.toString()}
-                                max={MAX_BPM.toString()}
-                            />
+                                        const newBpm = parseInt(value);
+                                        if (!isNaN(newBpm) && newBpm >= MIN_BPM && newBpm <= MAX_BPM) {
+                                            onBpmChange(newBpm);
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        const newBpm = parseInt(inputValue);
+                                        if (isNaN(newBpm) || newBpm < MIN_BPM) {
+                                            setInputValue(MIN_BPM.toString());
+                                            onBpmChange(MIN_BPM);
+                                        } else if (newBpm > MAX_BPM) {
+                                            setInputValue(MAX_BPM.toString());
+                                            onBpmChange(MAX_BPM);
+                                        }
+                                    }}
+                                    className="text-white text-xs bg-black px-2 py-1 w-16 text-center border-0 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    min={MIN_BPM.toString()}
+                                    max={MAX_BPM.toString()}
+                                />
+                            )}
                             <button
+                                type="button"
                                 onClick={() => onBpmChange(Math.min(MAX_BPM, bpm + 1))}
-                                className="bg-black hover:bg-white hover:text-black text-white text-xs px-2 py-1 border-l border-white border-opacity-50 cursor-pointer"
+                                disabled={isExternalClock}
+                                title={isExternalClock ? 'Tempo controlled by incoming MIDI clock' : undefined}
+                                className="cursor-pointer border-l border-white border-opacity-50 bg-black px-2 py-1 text-xs text-white hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-black disabled:hover:text-white"
                             >
                                 +
                             </button>

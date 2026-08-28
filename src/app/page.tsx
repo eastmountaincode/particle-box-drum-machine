@@ -132,6 +132,8 @@ const MainContent: React.FC<{
                             isPlaying={isPlaying}
                             currentStep={currentStep}
                             bpm={bpm}
+                            externalBpm={midi.detectedBpm}
+                            isExternalClock={midi.syncMode === 'follower'}
                             onPlayStop={onPlayStop}
                             onBpmChange={onBpmChange}
                         />
