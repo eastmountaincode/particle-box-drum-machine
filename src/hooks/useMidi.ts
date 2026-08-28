@@ -1,9 +1,17 @@
 'use client'
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useAtom } from 'jotai';
 import { midiService } from '@/services/midiService';
 import { midiClockManager } from '@/services/midiClockManager';
+import {
+    DEFAULT_MIDI_CLOCK_PREFERENCES,
+    midiDevicePreference,
+    readMidiClockPreferences,
+    resolveMidiDevicePreference,
+    writeMidiClockPreferences,
+    type MidiClockPreferences,
+} from '@/services/midiClockPreferences';
 import {
     midiSupportedAtom,
     midiInitializedAtom,
@@ -34,11 +42,60 @@ export const useMidi = (audioEngine: AudioEngineCallbacks) => {
     const [selectedInputId, setSelectedInputId] = useAtom(selectedMidiInputIdAtom);
     const [selectedOutputId, setSelectedOutputId] = useAtom(selectedMidiOutputIdAtom);
     const [detectedBpm, setDetectedBpm] = useAtom(midiDetectedBpmAtom);
+    const preferencesRef = useRef<MidiClockPreferences | null>(null);
+    const selectedInputIdRef = useRef<string | null>(selectedInputId);
+    const selectedOutputIdRef = useRef<string | null>(selectedOutputId);
+
+    const applyInputSelection = useCallback((deviceId: string | null) => {
+        if (deviceId) {
+            midiService.selectInput(deviceId);
+        } else {
+            midiService.clearInput();
+        }
+        selectedInputIdRef.current = deviceId;
+        setSelectedInputId(deviceId);
+    }, [setSelectedInputId]);
+
+    const applyOutputSelection = useCallback((deviceId: string | null) => {
+        if (deviceId) {
+            midiService.selectOutput(deviceId);
+        } else {
+            midiService.clearOutput();
+        }
+        selectedOutputIdRef.current = deviceId;
+        setSelectedOutputId(deviceId);
+    }, [setSelectedOutputId]);
+
+    const savePreferences = useCallback((
+        update: (current: MidiClockPreferences) => MidiClockPreferences,
+    ) => {
+        const current = preferencesRef.current ?? DEFAULT_MIDI_CLOCK_PREFERENCES;
+        const next = update(current);
+        preferencesRef.current = next;
+        writeMidiClockPreferences(window.localStorage, next);
+    }, []);
 
     const refreshDevices = useCallback(() => {
-        setMidiInputs(midiService.getInputs().map(d => ({ id: d.id, name: d.name })));
-        setMidiOutputs(midiService.getOutputs().map(d => ({ id: d.id, name: d.name })));
-    }, [setMidiInputs, setMidiOutputs]);
+        const inputs = midiService.getInputs();
+        const outputs = midiService.getOutputs();
+        setMidiInputs(inputs.map(d => ({ id: d.id, name: d.name })));
+        setMidiOutputs(outputs.map(d => ({ id: d.id, name: d.name })));
+
+        const preferences = preferencesRef.current;
+        if (!preferences) return;
+
+        const preferredInput = resolveMidiDevicePreference(inputs, preferences.input);
+        const nextInputId = preferredInput?.id ?? null;
+        if (nextInputId !== selectedInputIdRef.current) {
+            applyInputSelection(nextInputId);
+        }
+
+        const preferredOutput = resolveMidiDevicePreference(outputs, preferences.output);
+        const nextOutputId = preferredOutput?.id ?? null;
+        if (nextOutputId !== selectedOutputIdRef.current) {
+            applyOutputSelection(nextOutputId);
+        }
+    }, [applyInputSelection, applyOutputSelection, setMidiInputs, setMidiOutputs]);
 
     // Wire midiClockManager callbacks to audio engine
     useEffect(() => {
@@ -60,6 +117,14 @@ export const useMidi = (audioEngine: AudioEngineCallbacks) => {
         let cancelled = false;
 
         const init = async () => {
+            const preferences = readMidiClockPreferences(window.localStorage);
+            preferencesRef.current = preferences;
+            midiClockManager.setSyncMode(preferences.mode);
+            setSyncModeAtom(preferences.mode);
+            if (preferences.mode === 'follower') {
+                void prepareExternalClock();
+            }
+
             const supported = midiService.isSupported();
             if (cancelled) return;
             setMidiSupported(supported);
@@ -83,25 +148,29 @@ export const useMidi = (audioEngine: AudioEngineCallbacks) => {
             midiService.onDeviceChange(null);
             midiService.destroy();
         };
-    }, [refreshDevices, setMidiInitialized, setMidiSupported]);
+    }, [prepareExternalClock, refreshDevices, setMidiInitialized, setMidiSupported, setSyncModeAtom]);
 
     const selectInput = useCallback((deviceId: string | null) => {
-        if (deviceId) {
-            midiService.selectInput(deviceId);
-        } else {
-            midiService.clearInput();
-        }
-        setSelectedInputId(deviceId);
-    }, [setSelectedInputId]);
+        applyInputSelection(deviceId);
+        const device = deviceId
+            ? midiService.getInputs().find(({ id }) => id === deviceId) ?? null
+            : null;
+        savePreferences((current) => ({
+            ...current,
+            input: device ? midiDevicePreference(device) : null,
+        }));
+    }, [applyInputSelection, savePreferences]);
 
     const selectOutput = useCallback((deviceId: string | null) => {
-        if (deviceId) {
-            midiService.selectOutput(deviceId);
-        } else {
-            midiService.clearOutput();
-        }
-        setSelectedOutputId(deviceId);
-    }, [setSelectedOutputId]);
+        applyOutputSelection(deviceId);
+        const device = deviceId
+            ? midiService.getOutputs().find(({ id }) => id === deviceId) ?? null
+            : null;
+        savePreferences((current) => ({
+            ...current,
+            output: device ? midiDevicePreference(device) : null,
+        }));
+    }, [applyOutputSelection, savePreferences]);
 
     const setSyncMode = useCallback((mode: SyncMode) => {
         if (mode === 'follower') {
@@ -109,14 +178,17 @@ export const useMidi = (audioEngine: AudioEngineCallbacks) => {
         }
         midiClockManager.setSyncMode(mode);
         setSyncModeAtom(mode);
+        savePreferences((current) => ({ ...current, mode }));
         if (mode !== 'follower') {
             setDetectedBpm(null);
         }
-    }, [prepareExternalClock, setSyncModeAtom, setDetectedBpm]);
+    }, [prepareExternalClock, savePreferences, setSyncModeAtom, setDetectedBpm]);
 
     const reinitAndRefresh = useCallback(async () => {
         const success = await midiService.reinitialize();
         setMidiInitialized(success);
+        selectedInputIdRef.current = null;
+        selectedOutputIdRef.current = null;
         setSelectedInputId(null);
         setSelectedOutputId(null);
         if (success) {
