@@ -80,8 +80,11 @@ export const GlobalControls: React.FC<GlobalControlsProps> = ({
             {/* Play/Stop Button - Only show in tech mode */}
             {!visualMode && (
                 <button
+                    type="button"
                     onClick={onPlayStop}
-                    className="bg-black hover:bg-white hover:text-black text-white text-xs py-2 border border-white border-opacity-50 cursor-pointer w-16 text-center"
+                    disabled={isExternalClock}
+                    title={isExternalClock ? 'Transport controlled by incoming MIDI clock' : undefined}
+                    className="w-16 cursor-pointer border border-white border-opacity-50 bg-black py-2 text-center text-xs text-white hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-black disabled:hover:text-white"
                 >
                     {isPlaying ? 'STOP' : 'PLAY'}
                 </button>
