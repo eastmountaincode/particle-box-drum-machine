@@ -181,7 +181,7 @@ const TrackRow: React.FC<{
     const [particleCount, setParticleCount] = useAtom(getParticleCountAtom(index));
     const [useLighting, setUseLighting] = useAtom(getLightingAtom(index));
     const [steps, setSteps] = useAtom(getSequencerStepsAtom(index));
-    const { playSample } = useDrumSamples(index);
+    const { playSample, isLoaded } = useDrumSamples(index);
     const { onCollisionHit } = useCollisionPlayback(index, playSample);
 
     const { registerHit, onStepTriggered: onQuantizedStep } = useQuantization({
@@ -190,7 +190,7 @@ const TrackRow: React.FC<{
     });
 
     // Per-track sample playback - now returns a callback instead of using useEffect
-    const { onStepTriggered } = useTrackSamplePlayback(index, playSample);
+    const { onStepTriggered, trigger } = useTrackSamplePlayback(index, playSample);
 
     const handleStepTriggered = useCallback((step: number, time?: number) => {
         onQuantizedStep(step, time);
@@ -267,6 +267,8 @@ const TrackRow: React.FC<{
                     onLightingToggle={() => setUseLighting(!useLighting)}
                     particleCount={particleCount}
                     onParticleCountChange={setParticleCount}
+                    onTrigger={trigger}
+                    triggerReady={isLoaded}
                 />
             </div>
 

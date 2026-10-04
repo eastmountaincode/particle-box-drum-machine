@@ -8,6 +8,8 @@ import { InlineTooltip } from './Tutorial/InlineTooltip';
 import { useTutorial } from './Tutorial/TutorialContext';
 
 interface ControlPanelProps {
+  onTrigger: () => void;
+  triggerReady: boolean;
   trackNumber?: number;
   useLighting?: boolean;
   onLightingToggle?: () => void;
@@ -23,7 +25,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   useLighting = false,
   onLightingToggle,
   particleCount = 3,
-  onParticleCountChange
+  onParticleCountChange,
+  onTrigger,
+  triggerReady
 }) => {
   const [sampleIndex, setSampleIndex] = useAtom(getSampleIndexAtom(trackNumber - 1));
   const [quantizationEnabled, setQuantizationEnabled] = useAtom(getQuantizationAtom(trackNumber - 1));
@@ -74,10 +78,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     <div className="w-full h-full bg-black border border-white border-opacity-50 p-2 flex gap-2 select-none relative">
       {/* Main controls column */}
       <div className="flex-1 flex flex-col gap-2">
+        <div className="flex-1 flex gap-2 min-h-0">
         {/* Mute button */}
         <button
           onClick={handleMuteToggle}
-          className={`flex-1 text-xs px-2 border border-white border-opacity-50 cursor-pointer ${muteEnabled
+          className={`flex-1 text-xs px-1 whitespace-nowrap border border-white border-opacity-50 cursor-pointer ${muteEnabled
             ? 'bg-white text-black'
             : 'bg-black text-white hover:bg-white hover:text-black'
             }`}
@@ -88,13 +93,44 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         {/* Freeze pattern button */}
         <button
           onClick={handleFreezeToggle}
-          className={`flex-1 text-xs px-2 border border-white border-opacity-50 cursor-pointer ${freezeEnabled
+          className={`flex-1 text-xs px-1 whitespace-nowrap border border-white border-opacity-50 cursor-pointer ${freezeEnabled
             ? 'bg-white text-black'
             : 'bg-black text-white hover:bg-white hover:text-black'
             }`}
           data-tutorial={`freeze-button-${trackNumber - 1}`}
         >
           FREEZE {freezeEnabled ? 'ON' : 'OFF'}
+        </button>
+
+        </div>
+
+        <button
+            type="button"
+            aria-label={`Trigger track ${trackNumber}`}
+            data-testid={`track-trigger-${trackNumber - 1}`}
+            disabled={!triggerReady}
+            title="Play a hit. With playback, FREEZE and Q on, add it to the nearest step."
+            onPointerDown={(event) => {
+                if (!triggerReady || event.button !== 0) return;
+                event.preventDefault();
+                event.currentTarget.focus();
+                onTrigger();
+            }}
+            onKeyDown={(event) => {
+                if (event.key !== ' ' && event.key !== 'Enter') return;
+                event.preventDefault();
+                if (!event.repeat) onTrigger();
+            }}
+            onKeyUp={(event) => {
+                if (event.key === ' ' || event.key === 'Enter') event.preventDefault();
+            }}
+            onClick={(event) => {
+                // Assistive technologies invoke click without pointer/key events.
+                if (event.detail === 0) onTrigger();
+            }}
+            className="flex-1 text-xs border border-white cursor-pointer touch-none bg-black text-white hover:bg-white hover:text-black active:bg-red-600 active:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-40 disabled:cursor-wait"
+        >
+            TRIGGER
         </button>
 
         {/* Particle count control row */}
@@ -186,7 +222,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         <InlineTooltip
           title="Track Controls"
           content={`• MUTE track.
-• FREEZE locks in the pattern based on the previous 16 steps. When FREEZE is OFF, the sequencer gets its input exclusively from the Particle Box. When FREEZE is ON, the sequencer gets its input exclusively from the sequence pads.
+• FREEZE locks in the pattern based on the previous 16 steps. When FREEZE is OFF, the sequencer gets its input exclusively from the Particle Box. When FREEZE is ON, edit the pattern with the sequence pads or TRIGGER.
+• TRIGGER plays a hit immediately. While playing with FREEZE and Q on, it adds the hit to the nearest sixteenth-note step. With FREEZE off or playback stopped, it only auditions the sound. MUTE silences it.
 • Use + and − buttons to control number of particles.
 • Adjust the sample with the arrow keys
 • Q turns quantization on and off (when the particle hits the wall, it will be quantized to the nearest 16th note).

@@ -96,7 +96,7 @@ export const SequencerDisplay: React.FC<SequencerDisplayProps> = ({
                     title="Step Sequencer"
                     content={`• Click steps to manually activate pads.
 • Dots show active steps.
-• Remember, if FREEZE is off, all input to the sequencer is coming from Particle Box collisions. Any manual activation will be overwritten by input from Particle Box if FREEZE is on.`}
+• Remember, if FREEZE is off, all input to the sequencer is coming from Particle Box collisions. Manual edits are overwritten by collisions while FREEZE is off. With FREEZE and Q on, use TRIGGER during playback to add hits to the loop.`}
                     position="right"
                     offsetX={-75}
                     isVisible={isTutorialActive}
