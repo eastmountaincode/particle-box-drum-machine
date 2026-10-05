@@ -175,3 +175,16 @@ export const midiOutputsAtom = atom<{ id: string; name: string }[]>([]);
 export const selectedMidiInputIdAtom = atom<string | null>(null);
 export const selectedMidiOutputIdAtom = atom<string | null>(null);
 export const midiDetectedBpmAtom = atom<number | null>(null);
+
+// Camera positions also encode each track's particle speed and size.
+export type ParticleCameraPosition = [number, number, number];
+const particleCameraAtoms = Array.from({ length: 4 }, () => atom<ParticleCameraPosition | null>(null));
+export const getParticleCameraAtom = (index: number) => {
+    const cameraAtom = particleCameraAtoms[index];
+    if (!cameraAtom) throw new Error(`Invalid track index: ${index}`);
+    return cameraAtom;
+};
+
+// A successful load remounts the track renderers, clearing pending hits and
+// restoring OrbitControls from the saved camera positions.
+export const presetLoadRevisionAtom = atom(0);

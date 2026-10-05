@@ -6,6 +6,8 @@ import { AudioOutputModal } from '@/components/AudioOutputModal';
 import { DrumKitsModal } from '@/components/DrumKitsModal';
 import { GlobalControls } from '@/components/GlobalControls';
 import { MidiClockModal } from '@/components/MidiClockModal';
+import { PresetsModal } from '@/components/PresetsModal';
+import { presetLoadRevisionAtom } from '@/store/atoms';
 import { ReverbModal } from '@/components/ReverbModal';
 import { SequencerDisplay } from '@/components/SequencerDisplay';
 import { TutorialProvider } from '@/components/Tutorial/TutorialContext';
@@ -93,6 +95,7 @@ export default function Home() {
                             currentStep={currentStep}
                             bpm={bpm}
                             onPlayStop={handlePlayStop}
+                            onBeforeLoad={stop}
                             onBpmChange={setBpm}
                             registerStepCallback={registerStepCallback}
                             unregisterStepCallback={unregisterStepCallback}
@@ -111,13 +114,15 @@ const MainContent: React.FC<{
     currentStep: number;
     bpm: number;
     onPlayStop: () => void;
+    onBeforeLoad: () => void;
     onBpmChange: (bpm: number) => void;
     registerStepCallback: (trackIndex: number, callback: (step: number, time?: number) => void) => void;
     unregisterStepCallback: (trackIndex: number) => void;
     visualMode: boolean;
     midi: ReturnType<typeof useMidi>;
-}> = ({ isPlaying, currentStep, bpm, onPlayStop, onBpmChange, registerStepCallback, unregisterStepCallback, visualMode, midi }) => {
+}> = ({ isPlaying, currentStep, bpm, onPlayStop, onBeforeLoad, onBpmChange, registerStepCallback, unregisterStepCallback, visualMode, midi }) => {
     const { isTutorialActive } = useTutorial();
+    const [presetRevision] = useAtom(presetLoadRevisionAtom);
 
     return (
         <>
@@ -138,7 +143,8 @@ const MainContent: React.FC<{
                             onBpmChange={onBpmChange}
                         />
                         {!visualMode && (
-                            <div className="flex shrink-0 items-center gap-2">
+                            <div className="grid shrink-0 grid-cols-3 items-center gap-2">
+                                <PresetsModal bpm={bpm} onBpmChange={onBpmChange} onBeforeLoad={onBeforeLoad} />
                                 <DrumKitsModal />
                                 <ReverbModal />
                                 <MidiClockModal {...midi} isPlaying={isPlaying} />
@@ -151,7 +157,7 @@ const MainContent: React.FC<{
                     <div className={visualMode ? "flex flex-col gap-4" : "flex-1 flex flex-col gap-4"}>
                         {[1, 2, 3, 4].map((row, index) => (
                             <TrackRow 
-                                key={row} 
+                                key={`${row}:${presetRevision}`}
                                 index={index} 
                                 trackNumber={row} 
                                 currentStep={currentStep} 

@@ -29,6 +29,7 @@ export interface ParticleStatsProps {
 }
 
 export interface CameraTrackerProps {
+    trackIndex: number;
   onParamsChange: (params: ParticleParams) => void;
   speedRange: [number, number];
   sizeRange: [number, number];

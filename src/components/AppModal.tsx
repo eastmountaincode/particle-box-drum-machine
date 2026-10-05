@@ -121,7 +121,7 @@ export function AppModal({ children, isOpen, onClose, title, testId }: AppModalP
                 ref={dialogRef}
                 aria-labelledby={titleId}
                 aria-modal="true"
-                className="w-full max-w-lg border border-white border-opacity-50 bg-black p-3 text-white"
+                className="max-h-full w-full max-w-lg overflow-y-auto border border-white border-opacity-50 bg-black p-3 text-white"
                 data-testid={testId}
                 role="dialog"
             >

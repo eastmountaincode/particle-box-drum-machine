@@ -1,18 +1,29 @@
 'use client';
 
 import React from 'react';
+import { useStore } from 'jotai';
+import { getParticleCameraAtom } from '@/store/atoms';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { CameraTrackerProps } from './types';
 
 export const CameraTracker: React.FC<CameraTrackerProps> = ({ 
-  onParamsChange, 
+  trackIndex,
+  onParamsChange,
   speedRange, 
   sizeRange 
 }) => {
   const { camera } = useThree();
+  const store = useStore();
 
   useFrame(() => {
+    const cameraAtom = getParticleCameraAtom(trackIndex);
+    const previous = store.get(cameraAtom);
+    const { x, y, z } = camera.position;
+    if (!previous || previous[0] !== x || previous[1] !== y || previous[2] !== z) {
+        store.set(cameraAtom, [x, y, z]);
+    }
+
     // Get camera's spherical coordinates relative to the cube center
     const spherical = new THREE.Spherical();
     spherical.setFromVector3(camera.position);

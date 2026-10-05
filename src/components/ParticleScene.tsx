@@ -3,8 +3,8 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { useAtomValue } from 'jotai';
-import { backgroundColorAtom, getFreezeAtom, getQuantizationAtom, getMuteAtom } from '../store/atoms';
+import { useAtomValue, useStore } from 'jotai';
+import { getParticleCameraAtom, backgroundColorAtom, getFreezeAtom, getQuantizationAtom, getMuteAtom } from '../store/atoms';
 import { CameraTracker } from './CameraTracker';
 import { SceneLighting } from './SceneLighting';
 import { EdgeOnlyCube } from './EdgeOnlyCube';
@@ -23,6 +23,7 @@ export const ParticleScene: React.FC<ParticleSceneProps> = ({
   sizeRange,
   trackIndex = 0
 }) => {
+  const store = useStore();
   const defaultBackgroundColor = useAtomValue(backgroundColorAtom);
   const freezeEnabled = useAtomValue(getFreezeAtom(trackIndex));
   const quantizationEnabled = useAtomValue(getQuantizationAtom(trackIndex));
@@ -41,6 +42,8 @@ export const ParticleScene: React.FC<ParticleSceneProps> = ({
 
   // Generate random initial camera position using spherical coordinates
   const initialCameraPosition = useMemo(() => {
+    const savedPosition = store.get(getParticleCameraAtom(trackIndex));
+    if (savedPosition) return [...savedPosition] as [number, number, number];
     // Random azimuth (theta) within the constrained range [-π/2, π/2]
     const randomAzimuth = (Math.random() - 0.5) * Math.PI; // Range: [-π/2, π/2]
     
@@ -56,7 +59,7 @@ export const ParticleScene: React.FC<ParticleSceneProps> = ({
     position.setFromSpherical(spherical);
     
     return [position.x, position.y, position.z] as [number, number, number];
-  }, []); // Only generate once per component mount
+  }, [store, trackIndex]); // A preset load remounts the track with its saved position.
 
   // Basic crash prevention - handle WebGL context loss and visibility changes
   useEffect(() => {
@@ -108,7 +111,8 @@ export const ParticleScene: React.FC<ParticleSceneProps> = ({
         gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       }}
     >
-      <CameraTracker 
+      <CameraTracker
+        trackIndex={trackIndex}
         onParamsChange={onParamsChange}
         speedRange={speedRange}
         sizeRange={sizeRange}
