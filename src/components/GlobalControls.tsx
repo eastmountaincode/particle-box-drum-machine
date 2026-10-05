@@ -176,7 +176,7 @@ export const GlobalControls: React.FC<GlobalControlsProps> = ({
                                 type="range"
                                 min="0"
                                 max="1"
-                                step="0.1"
+                                step="0.05"
                                 value={globalVolume}
                                 onChange={(e) => setGlobalVolume(parseFloat(e.target.value))}
                                 className="w-16 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
