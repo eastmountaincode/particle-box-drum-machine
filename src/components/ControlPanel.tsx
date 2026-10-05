@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { useAtom, useAtomValue } from 'jotai';
-import { getSampleIndexAtom, getQuantizationAtom, getFreezeAtom, getMuteAtom, getTrackVolumeAtom, selectedDrumKitIdAtom } from '@/store/atoms';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { getSampleIndexAtom, getQuantizationAtom, getFreezeAtom, getMuteAtom, getTrackVolumeAtom, getSequencerStepsAtom, selectedDrumKitIdAtom } from '@/store/atoms';
 import { getInstrumentForTrack, getSampleName, getSampleCount } from '@/utils/samples';
 import { InlineTooltip } from './Tutorial/InlineTooltip';
 import { useTutorial } from './Tutorial/TutorialContext';
@@ -34,6 +34,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   const [freezeEnabled, setFreezeEnabled] = useAtom(getFreezeAtom(trackNumber - 1));
   const [muteEnabled, setMuteEnabled] = useAtom(getMuteAtom(trackNumber - 1));
   const [trackVolume, setTrackVolume] = useAtom(getTrackVolumeAtom(trackNumber - 1));
+    const setSequencerSteps = useSetAtom(getSequencerStepsAtom(trackNumber - 1));
   const selectedKitId = useAtomValue(selectedDrumKitIdAtom);
   const instrument = getInstrumentForTrack(trackNumber - 1);
   const currentSample = getSampleName(selectedKitId, instrument, sampleIndex);
@@ -74,6 +75,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     setMuteEnabled(!muteEnabled);
   };
 
+    const handleClear = () => {
+        setSequencerSteps((previousSteps) => previousSteps.map(() => false));
+    };
+
   return (
     <div className="w-full h-full bg-black border border-white border-opacity-50 p-2 flex gap-2 select-none relative">
       {/* Main controls column */}
@@ -104,34 +109,46 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
         </div>
 
-        <button
-            type="button"
-            aria-label={`Trigger track ${trackNumber}`}
-            data-testid={`track-trigger-${trackNumber - 1}`}
-            disabled={!triggerReady}
-            title="Play a hit. With playback, FREEZE and Q on, add it to the nearest step."
-            onPointerDown={(event) => {
-                if (!triggerReady || event.button !== 0) return;
-                event.preventDefault();
-                event.currentTarget.focus();
-                onTrigger();
-            }}
-            onKeyDown={(event) => {
-                if (event.key !== ' ' && event.key !== 'Enter') return;
-                event.preventDefault();
-                if (!event.repeat) onTrigger();
-            }}
-            onKeyUp={(event) => {
-                if (event.key === ' ' || event.key === 'Enter') event.preventDefault();
-            }}
-            onClick={(event) => {
-                // Assistive technologies invoke click without pointer/key events.
-                if (event.detail === 0) onTrigger();
-            }}
-            className="flex-1 text-xs border border-white cursor-pointer touch-none bg-black text-white hover:bg-white hover:text-black active:bg-red-600 active:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-40 disabled:cursor-wait"
-        >
-            TRIGGER
-        </button>
+        <div className="flex-1 flex gap-2 min-h-0">
+            <button
+                type="button"
+                aria-label={`Clear recorded steps for track ${trackNumber}`}
+                data-testid={`track-clear-${trackNumber - 1}`}
+                title="Clear this track's recorded steps. With FREEZE off, particles continue generating new steps."
+                onClick={handleClear}
+                className="flex-1 text-xs border border-white cursor-pointer bg-black text-white hover:bg-white hover:text-black active:bg-red-600 active:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+                CLEAR
+            </button>
+            <button
+                type="button"
+                aria-label={`Trigger track ${trackNumber}`}
+                data-testid={`track-trigger-${trackNumber - 1}`}
+                disabled={!triggerReady}
+                title="Play a hit. With playback, FREEZE and Q on, add it to the nearest step."
+                onPointerDown={(event) => {
+                    if (!triggerReady || event.button !== 0) return;
+                    event.preventDefault();
+                    event.currentTarget.focus();
+                    onTrigger();
+                }}
+                onKeyDown={(event) => {
+                    if (event.key !== ' ' && event.key !== 'Enter') return;
+                    event.preventDefault();
+                    if (!event.repeat) onTrigger();
+                }}
+                onKeyUp={(event) => {
+                    if (event.key === ' ' || event.key === 'Enter') event.preventDefault();
+                }}
+                onClick={(event) => {
+                    // Assistive technologies invoke click without pointer/key events.
+                    if (event.detail === 0) onTrigger();
+                }}
+                className="flex-1 text-xs border border-white cursor-pointer touch-none bg-black text-white hover:bg-white hover:text-black active:bg-red-600 active:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-40 disabled:cursor-wait"
+            >
+                TRIGGER
+            </button>
+        </div>
 
         {/* Particle count control row */}
         <div className="flex-1 flex items-center border border-white border-opacity-50" data-tutorial={`particle-count-${trackNumber - 1}`}>
@@ -224,6 +241,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           content={`• MUTE track.
 • FREEZE locks in the pattern based on the previous 16 steps. When FREEZE is OFF, the sequencer gets its input exclusively from the Particle Box. When FREEZE is ON, edit the pattern with the sequence pads or TRIGGER.
 • TRIGGER plays a hit immediately. While playing with FREEZE and Q on, it adds the hit to the nearest sixteenth-note step. With FREEZE off or playback stopped, it only auditions the sound. MUTE silences it.
+• CLEAR erases this track's recorded steps. With FREEZE off, particles continue generating new steps.
 • Use + and − buttons to control number of particles.
 • Adjust the sample with the arrow keys
 • Q turns quantization on and off (when the particle hits the wall, it will be quantized to the nearest 16th note).
