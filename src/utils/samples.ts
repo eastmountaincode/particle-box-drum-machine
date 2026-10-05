@@ -36,7 +36,7 @@ export type InstrumentType = keyof typeof SAMPLE_DATA;
 
 export const INSTRUMENT_TYPES: InstrumentType[] = ['kick', 'snare', 'hat', 'tom'];
 
-export const DRUM_KIT_IDS = ['tr-909', 'cr-78', 'lm-2', 'mrk-2', 'tr-505'] as const;
+export const DRUM_KIT_IDS = ['tr-909', 'cr-78', 'lm-2', 'dmx', 'tr-505'] as const;
 
 export type DrumKitId = (typeof DRUM_KIT_IDS)[number];
 
@@ -87,7 +87,7 @@ const KIT_BASE_PATHS: Record<DrumKitId, string> = {
   'tr-909': '/audio/tr_909',
   'cr-78': '/audio/kits/cr-78/samples',
   'lm-2': '/audio/kits/lm-2/samples',
-  'mrk-2': '/audio/kits/mrk-2/samples',
+  'dmx': '/audio/kits/dmx/samples',
   'tr-505': '/audio/kits/tr-505/samples'
 };
 
@@ -188,17 +188,23 @@ const lm2Samples: Record<InstrumentType, readonly DrumSampleDefinition[]> = {
   ]
 };
 
-const mrk2Samples: Record<InstrumentType, readonly DrumSampleDefinition[]> = {
-  kick: [defineSample('mrk-2', 'kick', 'kick.wav', 'Kick')],
-  snare: [defineSample('mrk-2', 'snare', 'snare.wav', 'Snare')],
-  hat: [
-    defineSample('mrk-2', 'hat', 'hihat-closed.wav', 'Closed Hi-Hat'),
-    defineSample('mrk-2', 'hat', 'hihat-open.wav', 'Open Hi-Hat')
-  ],
-  tom: [
-    defineSample('mrk-2', 'tom', 'tom.wav', 'Tom'),
-    defineSample('mrk-2', 'tom', 'bongo.wav', 'Bongo')
-  ]
+const dmxSamples: Record<InstrumentType, readonly DrumSampleDefinition[]> = {
+    kick: [defineSample('dmx', 'kick', 'kick.wav', 'Kick')],
+    snare: [
+        defineSample('dmx', 'snare', 'snare.wav', 'Snare'),
+        defineSample('dmx', 'snare', 'clap.wav', 'Hand Clap')
+    ],
+    hat: [
+        defineSample('dmx', 'hat', 'hi-hat-1.wav', 'Hi-Hat 1'),
+        defineSample('dmx', 'hat', 'hi-hat-2.wav', 'Hi-Hat 2'),
+        defineSample('dmx', 'hat', 'hi-hat-3.wav', 'Hi-Hat 3'),
+        defineSample('dmx', 'hat', 'crash.wav', 'Crash')
+    ],
+    tom: [
+        defineSample('dmx', 'tom', 'tom.wav', 'Tom'),
+        defineSample('dmx', 'tom', 'cabasa.wav', 'Cabasa'),
+        defineSample('dmx', 'tom', 'rimshot.wav', 'Rimshot')
+    ]
 };
 
 const tr505Samples: Record<InstrumentType, readonly DrumSampleDefinition[]> = {
@@ -279,26 +285,26 @@ export const DRUM_KITS: Record<DrumKitId, DrumKitDefinition> = {
     },
     samples: lm2Samples
   },
-  'mrk-2': {
-    id: 'mrk-2',
-    name: 'Maestro Rhythm King MRK-2',
-    label: 'Maestro Rhythm King MRK-2',
-    description: 'Maestro Rhythm King MRK-2 analog rhythm-machine samples.',
-    basePath: KIT_BASE_PATHS['mrk-2'],
-    source: 'Oramics Sampled',
-    sourceUrl: `${ORAMICS_BASE_URL}/MRK-2`,
-    license: 'Public Domain',
-    licenseUrl: `https://github.com/oramics/sampled/blob/${ORAMICS_COMMIT}/DM/MRK-2/README.md`,
-    licenseNote: 'The source manifest explicitly designates this kit as Public Domain.',
-    audioFormat: {
-      container: 'WAV',
-      encoding: 'PCM',
-      bitDepth: 16,
-      sampleRateHz: 44100,
-      channels: 1
+    'dmx': {
+        id: 'dmx',
+        name: 'Oberheim DMX',
+        label: 'Oberheim DMX',
+        description: 'Punchy vintage DMX drums, hand clap, hi-hats and percussion.',
+        basePath: KIT_BASE_PATHS['dmx'],
+        source: 'SV Modular DrumKit',
+        sourceUrl: 'https://github.com/SVModular/DrumKit/tree/58755a32837522a64b6b886b764dbefc9a2b8fd3/res/samples/dmx',
+        license: 'CC0 1.0 Universal',
+        licenseUrl: 'https://github.com/SVModular/DrumKit/blob/58755a32837522a64b6b886b764dbefc9a2b8fd3/LICENSE.txt',
+        licenseNote: 'The source project is distributed under CC0. Samples converted from modular-voltage float data to 24-bit PCM WAV.',
+        audioFormat: {
+            container: 'WAV',
+            encoding: 'PCM',
+            bitDepth: 24,
+            sampleRateHz: 44100,
+            channels: 1
+        },
+        samples: dmxSamples
     },
-    samples: mrk2Samples
-  },
   'tr-505': {
     id: 'tr-505',
     name: 'Roland TR-505',

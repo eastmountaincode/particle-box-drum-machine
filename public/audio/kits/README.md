@@ -1,5 +1,10 @@
 # Vintage drum kit sources
 
+The active kits include Oberheim DMX in place of Maestro Rhythm King. Its samples
+come from SV Modular's CC0-licensed DrumKit collection; see `dmx/README.md` for
+the pinned source, conversion details, and sample mapping. The original Maestro
+files remain archived here but are no longer offered in the kit selector.
+
 The `cr-78`, `lm-2`, `mrk-2`, and `tr-505` directories are copied from
 [`oramics/sampled`](https://github.com/oramics/sampled) at commit
 `84d3405e107ad52986e7ca99af6a4ed3efe205de`.
