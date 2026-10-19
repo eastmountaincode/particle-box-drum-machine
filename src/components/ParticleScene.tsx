@@ -96,6 +96,8 @@ export const ParticleScene: React.FC<ParticleSceneProps> = ({
   return (
     <Canvas
       ref={canvasRef}
+      // The app scales its layout; measure before that transform so WebGL scales once.
+      resize={{ offsetSize: true }}
       camera={{ position: initialCameraPosition, fov: 40 }}
       style={{ 
         background: backgroundColor,
