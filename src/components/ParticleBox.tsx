@@ -5,7 +5,6 @@ import { ParticleScene } from './ParticleScene';
 import { ParticleParams, ParticleBoxProps } from './types';
 import { InlineTooltip } from './Tutorial/InlineTooltip';
 import { useTutorial } from './Tutorial/TutorialContext';
-import { isPageBackgrounded } from '@/services/backgroundParticleClock';
 
 const SPEED_RANGE: [number, number] = [0, 4];
 const SIZE_RANGE: [number, number] = [2, 10];
@@ -45,9 +44,9 @@ export const ParticleBox: React.FC<ParticleBoxProps> = ({
   }, []);
 
   const handleWallHit = useCallback((wall: string, time?: number) => {
-    // Visual feedback stays on the visual clock. Hidden-tab collisions still
-    // reach the audio callbacks without creating throttled UI timers.
-    if (!isPageBackgrounded()) {
+    // Visible windows still flash when another instrument has focus. Only
+    // hidden tabs skip UI timers; collision audio keeps running in either case.
+    if (document.visibilityState === 'visible') {
       setFlashingWalls(prev => new Set(prev).add(wall));
 
       const existingTimeout = timeoutRefsRef.current.get(wall);
