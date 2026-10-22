@@ -14,6 +14,7 @@ export class MidiService {
     private activeOutputReady: Promise<MIDIOutput | null> | null = null;
     private inputSelectionToken = 0;
     private outputSelectionToken = 0;
+    private initializationToken = 0;
     private messageCallback: MidiMessageCallback | null = null;
     private onDeviceChangeCallback: (() => void) | null = null;
 
@@ -23,8 +24,11 @@ export class MidiService {
 
     async initialize(): Promise<boolean> {
         if (!navigator.requestMIDIAccess) return false;
+        const token = ++this.initializationToken;
         try {
-            this.midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+            const access = await navigator.requestMIDIAccess({ sysex: false });
+            if (token !== this.initializationToken) return false;
+            this.midiAccess = access;
             this.midiAccess.onstatechange = () => {
                 this.onDeviceChangeCallback?.();
             };
@@ -188,6 +192,7 @@ export class MidiService {
     }
 
     destroy(): void {
+        this.initializationToken += 1;
         this.clearInput();
         this.clearOutput();
         if (this.midiAccess) {

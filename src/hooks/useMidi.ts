@@ -143,10 +143,21 @@ export const useMidi = (audioEngine: AudioEngineCallbacks) => {
 
         midiService.onDeviceChange(refreshDevices);
 
-        return () => {
+        const cleanup = () => {
             cancelled = true;
             midiService.onDeviceChange(null);
             midiService.destroy();
+        };
+        const handlePageHide = (event: PageTransitionEvent) => {
+            if (event.persisted) return;
+            midiClockManager.setCallbacks(null);
+            cleanup();
+        };
+        window.addEventListener('pagehide', handlePageHide);
+
+        return () => {
+            window.removeEventListener('pagehide', handlePageHide);
+            cleanup();
         };
     }, [prepareExternalClock, refreshDevices, setMidiInitialized, setMidiSupported, setSyncModeAtom]);
 

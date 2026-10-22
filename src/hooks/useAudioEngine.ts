@@ -38,6 +38,7 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
     const clockEventIdRef = useRef<number | null>(null);
     const isInitializedRef = useRef(false);
     const isStoppedRef = useRef(true);
+    const isClosingRef = useRef(false);
     const stepCallbacksRef = useRef<Map<number, (step: number, time?: number) => void>>(new Map());
     const syncModeRef = useRef<SyncMode>(syncMode);
 
@@ -118,7 +119,8 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
 
     const recoverAudioContext = useCallback(() => {
         if (
-            isStoppedRef.current
+            isClosingRef.current
+            || isStoppedRef.current
             || Tone.context.state === 'running'
             || Tone.context.state === 'closed'
             || resumePendingRef.current
@@ -141,6 +143,7 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
         if (isInitializedRef.current) return;
 
         isInitializedRef.current = true;
+        isClosingRef.current = false;
 
         const syncVisibleStep = () => {
             if (
@@ -161,13 +164,42 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
             syncVisibleStep();
         };
 
-        const handlePageHide = () => {
-            if (!isStoppedRef.current && syncModeRef.current === 'leader') {
+        const releasePlayback = () => {
+            const wasPlaying = !isStoppedRef.current;
+            // Block recovery, pending Play requests and MIDI callbacks before teardown.
+            isClosingRef.current = true;
+            isStoppedRef.current = true;
+            if (wasPlaying && syncModeRef.current === 'leader') {
                 midiClockManager.onInternalStop();
             }
+            deactivateBackgroundSupport();
+            particleClockRef.current?.dispose();
+            particleClockRef.current = null;
+            sequenceRef.current?.dispose();
+            sequenceRef.current = null;
+            if (clockEventIdRef.current !== null) {
+                Tone.Transport.clear(clockEventIdRef.current);
+                clockEventIdRef.current = null;
+            }
+            Tone.Transport.stop();
+            Tone.Transport.cancel();
+            Tone.Draw.cancel(0);
         };
 
-        const rawContext = Tone.getContext().rawContext;
+        const context = Tone.getContext();
+        const rawContext = context.rawContext;
+        const handlePageHide = (event: PageTransitionEvent) => {
+            // Cached pages can return with Back; only final navigation/close tears down audio.
+            if (event.persisted || isClosingRef.current) return;
+            releasePlayback();
+            if (context instanceof Tone.Context) {
+                // close() alone leaves Tone's worker ticker alive.
+                context.clockSource = 'offline';
+                void context.close().catch((error) => {
+                    console.warn('Audio context could not close:', error);
+                });
+            }
+        };
 
         document.addEventListener('visibilitychange', handleLifecycleChange);
         window.addEventListener('focus', handleLifecycleChange);
@@ -187,22 +219,7 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
             window.removeEventListener('keydown', recoverAudioContext);
             window.removeEventListener('pagehide', handlePageHide);
             rawContext.removeEventListener('statechange', recoverAudioContext);
-            if (!isStoppedRef.current && syncModeRef.current === 'leader') {
-                midiClockManager.onInternalStop();
-            }
-            deactivateBackgroundSupport();
-            particleClockRef.current?.dispose();
-            particleClockRef.current = null;
-            if (sequenceRef.current) {
-                sequenceRef.current.dispose();
-                sequenceRef.current = null;
-            }
-            if (clockEventIdRef.current !== null) {
-                Tone.Transport.clear(clockEventIdRef.current);
-                clockEventIdRef.current = null;
-            }
-            Tone.Transport.stop();
-            Tone.Transport.cancel();
+            releasePlayback();
             isInitializedRef.current = false;
         };
     }, [deactivateBackgroundSupport, recoverAudioContext, setCurrentStep]);
@@ -233,6 +250,7 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
     }, [setCurrentStep]);
 
     const prepareExternalClock = useCallback(async () => {
+        if (isClosingRef.current) return;
         try {
             if (Tone.context.state !== 'running') {
                 await Tone.start();
@@ -243,6 +261,7 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
     }, []);
 
     const handleExternalStart = useCallback(() => {
+        if (isClosingRef.current) return;
         // Publish the transport state synchronously. MIDI Start and the first
         // clock pulse may share a timestamp, so waiting for Tone.start() here
         // would cause that first pulse (step 0) to be discarded.
@@ -258,6 +277,7 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
     }, [activateBackgroundSupport, setCurrentStep]);
 
     const handleExternalContinue = useCallback(() => {
+        if (isClosingRef.current) return;
         isStoppedRef.current = false;
         activateBackgroundSupport();
         setIsPlaying(true);
@@ -298,7 +318,7 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
                     // events while a hidden or unfocused window cannot consume them.
                     if (!isPageBackgrounded()) {
                         Tone.Draw.schedule(() => {
-                            setCurrentStep(step);
+                            if (!isStoppedRef.current) setCurrentStep(step);
                         }, time);
                     }
                 }
@@ -326,6 +346,7 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
         if (syncMode === 'leader') {
             // A quarter note divided by 24 is a 96th note.
             clockEventIdRef.current = Tone.Transport.scheduleRepeat((time) => {
+                if (isStoppedRef.current) return;
                 const timestamp = performance.now() + Math.max(0, time - Tone.immediate()) * 1000;
                 midiClockManager.onInternalTick(timestamp);
             }, '96n');
@@ -340,11 +361,13 @@ export const useAudioEngine = (bpm: number): UseAudioEngineReturn => {
     }, [syncMode]);
 
     const start = useCallback(async () => {
+        if (isClosingRef.current) return;
         try {
             // Start Tone.js audio context (required for user interaction)
             if (Tone.context.state !== 'running') {
                 await Tone.start();
             }
+            if (isClosingRef.current) return;
 
             // In follower mode, don't start Tone transport - just mark as ready
             if (syncModeRef.current === 'follower') {
